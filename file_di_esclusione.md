@@ -1,0 +1,14 @@
+# File di sistema Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# File di sistema Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# File temporanei
+*.log
+*.tmp
+*.bak
