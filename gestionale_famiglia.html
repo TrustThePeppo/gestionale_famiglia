@@ -10,6 +10,9 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- CryptoJS (Fallback per crittografia su mobile locale) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -48,7 +51,7 @@
                 <p class="text-slate-500 text-sm mt-2">Inserisci le tue credenziali per accedere. Al primo accesso, la password che scriverai diventerà quella definitiva.</p>
             </div>
             
-            <form onsubmit="eseguiLogin(event)" class="space-y-5">
+            <form onsubmit="if(window.eseguiLogin) { window.eseguiLogin(event); } else { event.preventDefault(); alert('Caricamento in corso, riprova tra un secondo.'); } return false;" class="space-y-5">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Nome Utente</label>
                     <input type="text" id="login-user" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" placeholder="es. mario.rossi">
@@ -254,7 +257,7 @@
     <!-- ================= LOGICA APPLICAZIONE ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeAuth, signInAnonymously, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Inizializza Icone Iniziali
@@ -271,7 +274,8 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
+        // Forza la persistenza in memoria per evitare i blocchi di IndexedDB sui browser mobili in locale (file://)
+        const auth = initializeAuth(app, { persistence: inMemoryPersistence });
         const db = getFirestore(app);
         
         // Identificativo App Fisso
@@ -378,10 +382,16 @@
 
         // --- SISTEMA DI CRITTOGRAFIA (SHA-256) E LOGIN ---
         window.hashPassword = async (text) => {
-            const msgBuffer = new TextEncoder().encode(text);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            // Se in un contesto sicuro usa l'API nativa (più veloce)
+            if (window.crypto && window.crypto.subtle && window.isSecureContext) {
+                const msgBuffer = new TextEncoder().encode(text);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                // Fallback per dispositivi mobili e file locali (dove crypto.subtle è bloccato)
+                return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
+            }
         };
 
         const UTENTI_AUTORIZZATI = ['giuseppe.mastroiacovo', 'valentina.gaudieri'];
@@ -411,7 +421,14 @@
                 const hashedPass = await window.hashPassword(pass);
                 
                 const authRef = doc(db, 'artifacts', APP_ID, 'settings', 'auth_passwords');
-                const authSnap = await getDoc(authRef);
+                
+                // Timeout di 12 secondi per evitare caricamenti infiniti
+                const authSnap = await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => reject(new Error("Timeout: Impossibile contattare il server. Controlla la rete.")), 12000);
+                    getDoc(authRef)
+                        .then(res => { clearTimeout(timer); resolve(res); })
+                        .catch(err => { clearTimeout(timer); reject(err); });
+                });
                 
                 let databasePasswords = {};
                 if (authSnap.exists()) {
