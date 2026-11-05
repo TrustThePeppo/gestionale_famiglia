@@ -68,6 +68,7 @@
         </div>
     </div>
 
+    <div id="app-wrapper" class="flex w-full h-full" style="display: none;">
     <!-- NOTIFICA TOAST -->
     <div id="toast" class="fixed bottom-6 right-6 left-6 md:left-auto bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl pointer-events-none z-50 flex items-center gap-3 font-medium text-sm hidden">
         <i id="toast-icon" data-lucide="info" class="w-5 h-5 flex-shrink-0"></i>
@@ -253,6 +254,8 @@
         </div>
     </div>
 
+
+    </div>
 
     <!-- ================= LOGICA APPLICAZIONE ================= -->
     <script type="module">
@@ -482,6 +485,8 @@
                 console.error("Errore salvataggio sessione:", e);
             }
             document.getElementById('login-screen').classList.replace('flex', 'hidden');
+            const wrapper = document.getElementById('app-wrapper');
+            if (wrapper) wrapper.style.display = '';
             mostraNotifica(`Benvenuto/a ${user}!`, 'success');
             caricaDatiDatabase();
         }
@@ -519,10 +524,14 @@
             if (utenteAttivo && UTENTI_AUTORIZZATI.includes(utenteAttivo)) {
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('login-screen').classList.remove('flex');
+                const wrapper = document.getElementById('app-wrapper');
+                if (wrapper) wrapper.style.display = '';
                 caricaDatiDatabase();
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('login-screen').classList.add('flex');
+                const wrapper = document.getElementById('app-wrapper');
+                if (wrapper) wrapper.style.display = 'none';
             }
         }
 
