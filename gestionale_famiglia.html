@@ -48,13 +48,13 @@
                     <i data-lucide="lock" class="w-8 h-8"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-800">Accesso Riservato</h2>
-                <p class="text-slate-500 text-sm mt-2">Inserisci le tue credenziali per accedere. Al primo accesso, la password che scriverai diventerà quella definitiva.</p>
+                <p class="text-slate-500 text-sm mt-2">Inserisci l'email e la password che hai configurato su Firebase per accedere al tuo gestionale protetto.</p>
             </div>
             
             <form onsubmit="if(window.eseguiLogin) { window.eseguiLogin(event); } else { event.preventDefault(); alert('Caricamento in corso, riprova tra un secondo.'); } return false;" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Nome Utente</label>
-                    <input type="text" id="login-user" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" placeholder="es. mario.rossi">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                    <input type="email" id="login-email" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" placeholder="es. giuseppe@famiglia.it">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Password</label>
@@ -260,7 +260,7 @@
     <!-- ================= LOGICA APPLICAZIONE ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { initializeAuth, signInAnonymously, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Inizializza Icone Iniziali
@@ -278,7 +278,7 @@
 
         const app = initializeApp(firebaseConfig);
         // Forza la persistenza in memoria per evitare i blocchi di IndexedDB sui browser mobili in locale (file://)
-        const auth = initializeAuth(app, { persistence: inMemoryPersistence });
+        const auth = initializeAuth(app, { persistence: browserLocalPersistence });
         const db = getFirestore(app);
         
         // Identificativo App Fisso
@@ -383,25 +383,10 @@
             }, 3000);
         };
 
-        // --- SISTEMA DI CRITTOGRAFIA (SHA-256) E LOGIN ---
-        window.hashPassword = async (text) => {
-            // Se in un contesto sicuro usa l'API nativa (più veloce)
-            if (window.crypto && window.crypto.subtle && window.isSecureContext) {
-                const msgBuffer = new TextEncoder().encode(text);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            } else {
-                // Fallback per dispositivi mobili e file locali (dove crypto.subtle è bloccato)
-                return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
-            }
-        };
-
-        const UTENTI_AUTORIZZATI = ['giuseppe.mastroiacovo', 'valentina.gaudieri'];
-        
+        // --- SISTEMA DI LOGIN NATIVO FIREBASE ---
         window.eseguiLogin = async (e) => {
             e.preventDefault();
-            const user = document.getElementById('login-user').value.trim().toLowerCase();
+            const email = document.getElementById('login-email').value.trim();
             const pass = document.getElementById('login-pass').value.trim();
             const btn = document.getElementById('login-btn');
             const msg = document.getElementById('login-msg');
@@ -411,62 +396,19 @@
                 msg.innerText = testo;
             };
 
-            if (!UTENTI_AUTORIZZATI.includes(user)) {
-                mostraErrore('Nome utente non autorizzato.');
-                return;
-            }
-
-            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Verifica...';
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Accesso in corso...';
             lucide.createIcons();
             
             try {
-                // Generiamo l'hash della password scritta dall'utente
-                const hashedPass = await window.hashPassword(pass);
-                
-                const authRef = doc(db, 'artifacts', APP_ID, 'settings', 'auth_passwords');
-                
-                // Timeout di 12 secondi per evitare caricamenti infiniti
-                const authSnap = await new Promise((resolve, reject) => {
-                    const timer = setTimeout(() => reject(new Error("Timeout: Impossibile contattare il server. Controlla la rete.")), 12000);
-                    getDoc(authRef)
-                        .then(res => { clearTimeout(timer); resolve(res); })
-                        .catch(err => { clearTimeout(timer); reject(err); });
-                });
-                
-                let databasePasswords = {};
-                if (authSnap.exists()) {
-                    databasePasswords = authSnap.data();
-                }
-
-                if (!databasePasswords[user]) {
-                    // Primo accesso assoluto: salva l'hash in modo sicuro
-                    databasePasswords[user] = hashedPass;
-                    await setDoc(authRef, databasePasswords, { merge: true });
-                    mostraErrore('Prima registrazione password effettuata! Accesso...', 'text-emerald-500');
-                    completaLogin(user);
-                } else {
-                    if (databasePasswords[user] === hashedPass) {
-                        // Accesso corretto al database già aggiornato (Hash = Hash)
-                        completaLogin(user);
-                    } else if (databasePasswords[user] === pass) {
-                        // MIGRATORE: La password salvata su Firebase è ancora in chiaro e corrisponde!
-                        // Entriamo e nel frattempo la aggiorniamo salvandola nel formato Hash.
-                        databasePasswords[user] = hashedPass;
-                        await setDoc(authRef, databasePasswords, { merge: true });
-                        completaLogin(user);
-                    } else {
-                        mostraErrore('Password errata. Riprova.');
-                        btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
-                        lucide.createIcons();
-                    }
-                }
+                // Login Ufficiale tramite i server di Google
+                await signInWithEmailAndPassword(auth, email, pass);
+                // Il resto viene gestito automaticamente dal listener onAuthStateChanged in avviaApp()
             } catch (error) {
-                // Migliorata la gestione degli errori per capire il problema su mobile
-                let errorMsg = 'Errore di connessione. Riprova.';
-                if (error.code) {
-                   errorMsg += ` (${error.code})`;
-                } else if (error.message) {
-                   errorMsg = error.message;
+                let errorMsg = 'Credenziali errate o errore di rete.';
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    errorMsg = 'Email o password non valide. Riprova.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMsg = 'Errore di connessione. Controlla internet.';
                 }
                 
                 mostraErrore(errorMsg);
@@ -477,62 +419,42 @@
             }
         };
 
-        function completaLogin(user) {
+        window.esciDalGestionale = async () => {
             try { 
-                localStorage.setItem('gestionale_utente_attivo', user); 
-                sessionStorage.setItem('gestionale_utente_attivo', user);
+                await signOut(auth);
+                location.reload(); 
             } catch(e) {
-                console.error("Errore salvataggio sessione:", e);
+                console.error("Errore logout:", e);
+                location.reload();
             }
-            document.getElementById('login-screen').classList.replace('flex', 'hidden');
-            const wrapper = document.getElementById('app-wrapper');
-            if (wrapper) wrapper.style.display = '';
-            mostraNotifica(`Benvenuto/a ${user}!`, 'success');
-            caricaDatiDatabase();
-        }
-
-        window.esciDalGestionale = () => {
-            try { 
-                localStorage.removeItem('gestionale_utente_attivo');
-                sessionStorage.removeItem('gestionale_utente_attivo'); 
-            } catch(e) {}
-            location.reload(); 
         };
 
         // --- INIZIALIZZAZIONE SICURA ---
-        async function avviaApp() {
-            try { 
-                // Assicuriamoci che auth sia inizializzato correttamente
-                await signInAnonymously(auth); 
-            } catch (error) { 
-                console.warn("Accesso anonimo disabilitato o fallback attivo.", error); 
-            }
-
-            let utenteAttivo = null;
-            try { 
-                // Usiamo localStorage invece di sessionStorage per maggiore stabilità nella modalità PWA (Aggiungi a Home)
-                utenteAttivo = localStorage.getItem('gestionale_utente_attivo'); 
-                // Fallback su sessionStorage per retrocompatibilità
-                if(!utenteAttivo) {
-                    utenteAttivo = sessionStorage.getItem('gestionale_utente_attivo');
-                    if(utenteAttivo) localStorage.setItem('gestionale_utente_attivo', utenteAttivo);
+        function avviaApp() {
+            // Listener automatico di Firebase che controlla se l'utente è loggato
+            onAuthStateChanged(auth, (user) => {
+                const loginScreen = document.getElementById('login-screen');
+                const wrapper = document.getElementById('app-wrapper');
+                
+                if (user) {
+                    // Utente Autenticato con Successo
+                    loginScreen.classList.add('hidden');
+                    loginScreen.classList.remove('flex');
+                    if (wrapper) wrapper.style.display = '';
+                    
+                    // Resettiamo il bottone di login per la prossima volta
+                    const btn = document.getElementById('login-btn');
+                    if(btn) btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
+                    
+                    mostraNotifica(`Accesso sicuro completato!`, 'success');
+                    caricaDatiDatabase();
+                } else {
+                    // Nessun utente loggato o utente appena disconnesso
+                    loginScreen.classList.remove('hidden');
+                    loginScreen.classList.add('flex');
+                    if (wrapper) wrapper.style.display = 'none';
                 }
-            } catch(e) {
-                console.error("Errore lettura storage:", e);
-            }
-
-            if (utenteAttivo && UTENTI_AUTORIZZATI.includes(utenteAttivo)) {
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('login-screen').classList.remove('flex');
-                const wrapper = document.getElementById('app-wrapper');
-                if (wrapper) wrapper.style.display = '';
-                caricaDatiDatabase();
-            } else {
-                document.getElementById('login-screen').classList.remove('hidden');
-                document.getElementById('login-screen').classList.add('flex');
-                const wrapper = document.getElementById('app-wrapper');
-                if (wrapper) wrapper.style.display = 'none';
-            }
+            });
         }
 
         function caricaDatiDatabase() {
