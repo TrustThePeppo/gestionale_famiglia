@@ -317,7 +317,7 @@
         
         // Identificativo App Fisso
         const APP_ID = 'gestionale_famiglia_pro';
-        const ADMIN_EMAIL = 'trustthepeppo@gmail.com'; // Email Super Admin autorizzata
+        let ADMIN_EMAIL = ''; // Verrà popolata dinamicamente dal database per privacy totale su GitHub
         let currentUserId = 'famiglia_default'; 
 
         // Stato Globale Dati
@@ -523,66 +523,68 @@
 
         // --- INIZIALIZZAZIONE SICURA ---
         function avviaApp() {
-            // Listener automatico di Firebase che controlla se l'utente è loggato
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 const loginScreen = document.getElementById('login-screen');
                 const wrapper = document.getElementById('app-wrapper');
                 
                 if (user) {
-                    // Utente Autenticato con Successo
                     loginScreen.classList.add('hidden');
                     loginScreen.classList.remove('flex');
                     if (wrapper) wrapper.style.display = '';
                     
-                    // Aggiorna sessione
-                    const sEmail = user.email.replace(/\./g, '_');
-                    updateDoc(doc(db, 'artifacts', APP_ID, 'utenti', sEmail), { ultima_sessione: Date.now() }).catch(e => console.log('Update session skip'));
+                    const sanitizedEmail = user.email.replace(/\./g, '_');
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail), { ultima_sessione: Date.now() }).catch(e => {});
 
+                    const userRef = doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail);
+                    const snap = await getDoc(userRef);
+                    let data = snap.exists() ? snap.data() : null;
                     
-                    // Sblocco menu admin solo per l'amministratore
-                    if (user.email === ADMIN_EMAIL) {
+                    // Sicurezza: identifichiamo il Super Admin tramite Hash irreversibile (SHA-256) per non esporre l'email in chiaro su GitHub
+                    const isSuperAdmin = CryptoJS.SHA256(user.email).toString() === '37b2fb4aabb55fb5c52c8d7f742498b0258b10bf936e69a98de6bbf30dac7486';
+                    
+                    if (isSuperAdmin) {
+                        ADMIN_EMAIL = user.email; // Popoliamo la variabile dinamicamente
                         document.getElementById('nav-amministrazione').classList.remove('hidden');
+                        
+                        // Autocorrezione in caso di perdita del ruolo nel database
+                        if (data && data.ruolo !== 'admin') {
+                            await updateDoc(userRef, { ruolo: 'admin' });
+                            data.ruolo = 'admin';
+                        }
                     } else {
                         document.getElementById('nav-amministrazione').classList.add('hidden');
                     }
-                    
-                    // Caricamento Profilo e Permessi
-                    const sanitizedEmail = user.email.replace(/\./g, '_');
-                    const userRef = doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail);
-                    getDoc(userRef).then(snap => {
-                        if (snap.exists()) {
-                            window.appState.utenteCorrenteDati = snap.data();
-                            applicaPermessiMenu();
-                        } else {
-                            // Crea documento utente di default
-                            const defaultData = {
-                                email: user.email,
-                                ruolo: user.email === ADMIN_EMAIL ? 'admin' : 'standard',
-                                permessi: {
-                                    casa: { view: true, edit: true },
-                                    veicoli: { view: true, edit: true },
-                                    prestiti: { view: true, edit: true },
-                                    cibo: { view: true, edit: true },
-                                    note: { view: true, edit: true },
-                                    calendario: { view: true, edit: true }
-                                },
-                                ts: Date.now()
-                            };
-                            setDoc(userRef, defaultData).then(() => {
-                                window.appState.utenteCorrenteDati = defaultData;
-                                applicaPermessiMenu();
-                            });
-                        }
-                    });
 
-                    // Resettiamo il bottone di login per la prossima volta
+                    if (snap.exists()) {
+                        window.appState.utenteCorrenteDati = data;
+                        applicaPermessiMenu();
+                    } else {
+                        const defaultData = {
+                            email: user.email,
+                            ruolo: isSuperAdmin ? 'admin' : 'standard',
+                            permessi: {
+                                casa: { view: true, edit: true },
+                                veicoli: { view: true, edit: true },
+                                prestiti: { view: true, edit: true },
+                                cibo: { view: true, edit: true },
+                                note: { view: true, edit: true },
+                                calendario: { view: true, edit: true }
+                            },
+                            ts: Date.now()
+                        };
+                        await setDoc(userRef, defaultData);
+                        window.appState.utenteCorrenteDati = defaultData;
+                        applicaPermessiMenu();
+                    }
+
                     const btn = document.getElementById('login-btn');
                     if(btn) btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
                     
                     mostraNotifica(`Accesso sicuro completato!`, 'success');
+                    
+                    // Fondamentale: caricaDatiDatabase() deve essere chiamato SOLO DOPO aver identificato il Super Admin
                     caricaDatiDatabase();
                 } else {
-                    // Nessun utente loggato o utente appena disconnesso
                     loginScreen.classList.remove('hidden');
                     loginScreen.classList.add('flex');
                     if (wrapper) wrapper.style.display = 'none';
