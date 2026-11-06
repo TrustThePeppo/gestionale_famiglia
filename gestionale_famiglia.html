@@ -115,7 +115,7 @@
             </div>
 
             <!-- SEZIONE CASA -->
-            <div class="px-3">
+            <div id="nav-casa" class="px-3">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="home" class="w-4 h-4 flex-shrink-0"></i> Casa
                 </h3>
@@ -139,7 +139,7 @@
             </div>
 
             <!-- SEZIONE CIBO -->
-            <div class="px-3">
+            <div id="nav-cibo" class="px-3">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="shopping-basket" class="w-4 h-4 flex-shrink-0"></i> Alimenti e Detersivi
                 </h3>
@@ -152,7 +152,7 @@
             </div>
 
             <!-- SEZIONE VEICOLI -->
-            <div class="px-3">
+            <div id="nav-veicoli" class="px-3">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="car" class="w-4 h-4 flex-shrink-0"></i> Veicoli
                 </h3>
@@ -163,7 +163,7 @@
             </div>
 
             <!-- SEZIONE PRESTITI -->
-            <div class="px-3">
+            <div id="nav-prestiti" class="px-3">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="piggy-bank" class="w-4 h-4 flex-shrink-0"></i> Finanze
                 </h3>
@@ -172,7 +172,7 @@
                 </ul>
             </div>
             <!-- SEZIONE BLOCCO NOTE -->
-            <div class="px-3 mt-4">
+            <div id="nav-note" class="px-3 mt-4">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="notebook-pen" class="w-4 h-4 flex-shrink-0"></i> Blocco Note
                 </h3>
@@ -182,7 +182,7 @@
             </div>
 
             <!-- SEZIONE CALENDARIO -->
-            <div class="px-3 mt-4">
+            <div id="nav-calendario" class="px-3 mt-4">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <i data-lucide="calendar-heart" class="w-4 h-4 flex-shrink-0"></i> Agenda Condivisa
                 </h3>
@@ -287,7 +287,7 @@
     <!-- ================= LOGICA APPLICAZIONE ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { initializeAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Inizializza Icone Iniziali
@@ -315,6 +315,7 @@
 
         // Stato Globale Dati
         window.appState = {
+            utenteCorrenteDati: null,
             vistaAttuale: 'dashboard',
             sottoCategoria: 'Quadro Generale',
             dati: {
@@ -328,7 +329,8 @@
                 cibo_ricette: [],
                 cibo_menu_salvati: [],
                 detersivi: [],
-                calendario: []
+                calendario: [],
+                utenti: []
             },
             allegatiAperti: { idTarget: null, collezione: null }
         };
@@ -477,6 +479,35 @@
                         document.getElementById('nav-amministrazione').classList.add('hidden');
                     }
                     
+                    // Caricamento Profilo e Permessi
+                    const sanitizedEmail = user.email.replace(/\./g, '_');
+                    const userRef = doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail);
+                    getDoc(userRef).then(snap => {
+                        if (snap.exists()) {
+                            window.appState.utenteCorrenteDati = snap.data();
+                            applicaPermessiMenu();
+                        } else {
+                            // Crea documento utente di default
+                            const defaultData = {
+                                email: user.email,
+                                ruolo: user.email === ADMIN_EMAIL ? 'admin' : 'standard',
+                                permessi: {
+                                    casa: { view: true, edit: true },
+                                    veicoli: { view: true, edit: true },
+                                    prestiti: { view: true, edit: true },
+                                    cibo: { view: true, edit: true },
+                                    note: { view: true, edit: true },
+                                    calendario: { view: true, edit: true }
+                                },
+                                ts: Date.now()
+                            };
+                            setDoc(userRef, defaultData).then(() => {
+                                window.appState.utenteCorrenteDati = defaultData;
+                                applicaPermessiMenu();
+                            });
+                        }
+                    });
+
                     // Resettiamo il bottone di login per la prossima volta
                     const btn = document.getElementById('login-btn');
                     if(btn) btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
@@ -523,6 +554,15 @@
                 snap.forEach(d => window.appState.dati.allegati.push({ id: d.id, ...d.data() }));
                 renderizzaContenuto();
             }, (err) => console.error("Errore lettura allegati:", err));
+
+            refs.utenti = collection(db, 'artifacts', APP_ID, 'utenti');
+            if (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) {
+                onSnapshot(refs.utenti, (snap) => {
+                    window.appState.dati.utenti = [];
+                    snap.forEach(d => window.appState.dati.utenti.push({ id: d.id, ...d.data() }));
+                    if (window.appState.vistaAttuale === 'admin') renderizzaContenuto();
+                });
+            }
 
             refs.cibo_spesa = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_spesa');
             refs.cibo_menu = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_menu');
@@ -583,6 +623,39 @@
                 : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100 bg-transparent border border-transparent';
         };
 
+        
+        window.applicaPermessiMenu = () => {
+            const perm = window.appState.utenteCorrenteDati?.permessi;
+            if (!perm) return;
+            
+            // Funzione helper per mostrare/nascondere sezioni del menu laterale
+            const toggleSection = (id, isVisible) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isVisible ? 'block' : 'none';
+            };
+
+            // Aggiorniamo la visibilità delle macro-sezioni nella sidebar
+            toggleSection('nav-casa', perm.casa?.view);
+            toggleSection('nav-veicoli', perm.veicoli?.view);
+            toggleSection('nav-prestiti', perm.prestiti?.view);
+            toggleSection('nav-cibo', perm.cibo?.view);
+            toggleSection('nav-note', perm.note?.view);
+            toggleSection('nav-calendario', perm.calendario?.view);
+            
+            // Reindirizza alla dashboard se l'utente si trova in una vista non autorizzata
+            if (window.appState.vistaAttuale !== 'dashboard' && window.appState.vistaAttuale !== 'admin') {
+                const currentCat = window.appState.vistaAttuale;
+                if (perm[currentCat] && !perm[currentCat].view) {
+                    cambiaVista('dashboard', 'Quadro Generale', document.querySelector('[data-target="dashboard"]'));
+                }
+            }
+        };
+
+        window.puoModificare = (sezione) => {
+            const p = window.appState.utenteCorrenteDati?.permessi;
+            return p && p[sezione] && p[sezione].edit === true;
+        };
+
         // --- SISTEMA DI NAVIGAZIONE ---
         window.cambiaVista = function(vista, titolo, btnElement = null) {
             window.appState.vistaAttuale = vista;
@@ -622,56 +695,57 @@
                 container.innerHTML = creaHtmlScadenzario();
             }
             else if (window.appState.vistaAttuale === 'casa') {
-                actions.innerHTML = `<button onclick="apriModaleCasa()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Voce</button>`;
+                actions.innerHTML = puoModificare('casa') ? `<button onclick="apriModaleCasa()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Voce</button>` : '';
                 container.innerHTML = creaHtmlCasa(window.appState.sottoCategoria);
             }
             else if (window.appState.vistaAttuale === 'veicoli') {
                 if (window.appState.sottoCategoria === 'I Miei Mezzi') {
-                    actions.innerHTML = `<button onclick="apriModaleVeicolo()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="car-front" class="w-4 h-4"></i> Registra Veicolo</button>`;
+                    actions.innerHTML = puoModificare("veicoli") ? `<button onclick="apriModaleVeicolo()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="car-front" class="w-4 h-4"></i> Registra Veicolo</button>` : "";
                     container.innerHTML = creaHtmlVeicoli_Anagrafica();
                 } else {
                     container.innerHTML = creaHtmlVeicoli_Manutenzioni();
                 }
             }
             else if (window.appState.vistaAttuale === 'prestiti') {
-                actions.innerHTML = `<button onclick="apriModalePrestito()" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="piggy-bank" class="w-4 h-4"></i> Nuovo Finanziamento</button>`;
+                actions.innerHTML = puoModificare("prestiti") ? `<button onclick="apriModalePrestito()" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="piggy-bank" class="w-4 h-4"></i> Nuovo Finanziamento</button>` : "";
                 container.innerHTML = creaHtmlPrestiti();
             }
             else if (window.appState.vistaAttuale === 'cibo') {
                 if (window.appState.sottoCategoria === 'Lista della Spesa') {
-                    actions.innerHTML = `
+                    actions.innerHTML = puoModificare("cibo") ? `
                         <div class="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto justify-end">
                             <button onclick="ripristinaListaSpesa()" class="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors" title="Riporta tutto in dispensa"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Svuota Lista</button>
                             <button onclick="esportaSpesa()" class="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="share" class="w-4 h-4"></i> Invia / Copia</button>
                             <button onclick="apriModaleSpesa()" class="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi</button>
                         </div>
-                    `;
+                    ` : "";
                     container.innerHTML = creaHtmlCiboSpesa();
                 } else if (window.appState.sottoCategoria === 'Menu Settimanale') {
                     actions.innerHTML = `
                         <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                             <button onclick="esportaMenu()" class="w-full md:w-auto bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="download" class="w-4 h-4"></i> Esporta</button>
+                            ` + (puoModificare("cibo") ? `<button onclick="apriModaleSalvaMenu()" class="w-full md:w-auto bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="download" class="w-4 h-4"></i> Esporta</button>
                             <button onclick="apriModaleSalvaMenu()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="save" class="w-4 h-4"></i> Salva</button>
-                            <button onclick="apriModaleCaricaMenu()" class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="folder-open" class="w-4 h-4"></i> Modelli</button>
+                            <button onclick="apriModaleCaricaMenu()" class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="folder-open" class="w-4 h-4"></i> Modelli</button>` : "") + `
                         </div>
                     `;
                     container.innerHTML = creaHtmlCiboMenu();
                 } else if (window.appState.sottoCategoria === 'Ricette') {
-                    actions.innerHTML = `<button onclick="apriModaleRicetta()" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Nuova Ricetta</button>`;
+                    actions.innerHTML = puoModificare("cibo") ? `<button onclick="apriModaleRicetta()" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Nuova Ricetta</button>` : "";
                     container.innerHTML = creaHtmlCiboRicette();
                 } else if (window.appState.sottoCategoria === 'Detersivi') {
-                    actions.innerHTML = `
+                    actions.innerHTML = puoModificare("cibo") ? `
                         <div class="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto justify-end">
                             <button onclick="ripristinaListaDetersivi()" class="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors" title="Riporta tutto in dispensa"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Svuota Lista</button>
                             <button onclick="esportaDetersivi()" class="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="share" class="w-4 h-4"></i> Invia / Copia</button>
                             <button onclick="apriModaleDetersivo()" class="w-full md:w-auto bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi</button>
                         </div>
-                    `;
+                    ` : "";
                     container.innerHTML = creaHtmlDetersivi();
                 }
             }
             else if (window.appState.vistaAttuale === 'calendario') {
-                actions.innerHTML = `<button onclick="apriModaleEvento()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Nuovo Evento</button>`;
+                actions.innerHTML = puoModificare("calendario") ? `<button onclick="apriModaleEvento()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Nuovo Evento</button>` : "";
                 container.innerHTML = creaHtmlCalendario();
             }
             else if (window.appState.vistaAttuale === 'admin') {
@@ -687,7 +761,7 @@
                             </div>
                             <button onclick="eseguiRicercaNote()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex-shrink-0">Avvia ricerca</button>
                         </div>
-                        <button onclick="apriModaleNota()" class="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors flex-shrink-0"><i data-lucide="plus" class="w-4 h-4"></i> Nuova Nota</button>
+                        ` + (puoModificare("note") ? `<button onclick="apriModaleNota()" class="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors flex-shrink-0"><i data-lucide="plus" class="w-4 h-4"></i> Nuova Nota</button>` : "") + `
                     </div>
                 `;
                 container.innerHTML = creaHtmlNote();
@@ -946,12 +1020,13 @@
                                 <i data-lucide="paperclip" class="w-4 h-4"></i>
                                 ${countAl > 0 ? `<span class="text-xs font-bold leading-none">${countAl}</span>` : ''}
                             </button>
+                            ${puoModificare('casa') ? `
                             <button onclick="apriModaleCasa('${v.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica Voce">
                                 <i data-lucide="edit" class="w-4 h-4"></i>
                             </button>
                             <button onclick="eliminaDoc('casa', '${v.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md border border-transparent" title="Elimina Voce">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
+                            </button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -982,12 +1057,13 @@
                             <i data-lucide="paperclip" class="w-4 h-4"></i>
                             ${countAl > 0 ? `<span class="text-xs font-bold leading-none">${countAl}</span>` : ''}
                         </button>
+                        ${puoModificare('veicoli') ? `
                         <button onclick="apriModaleVeicolo('${v.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-md transition-colors border border-transparent" title="Modifica Veicolo">
                             <i data-lucide="edit" class="w-4 h-4"></i>
                         </button>
                         <button onclick="eliminaDoc('veicoli', '${v.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors border border-transparent" title="Elimina Veicolo">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
+                        </button>` : ''}
                     </div>
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0"><i data-lucide="${v.tipo === 'Moto' ? 'bike' : 'car-front'}"></i></div>
@@ -1078,8 +1154,8 @@
                                 <button onclick="apriModaleAllegati('manutenzioni', '${m.idMan}', 'Allegati ${safeTipo}')" class="${window.getGraffettaClass(m.idMan)} transition-colors p-1.5 rounded-md flex items-center gap-1" title="Allega Fattura/Ricevuta">
                                     <i data-lucide="paperclip" class="w-4 h-4"></i> ${countAl > 0 ? `<span class="text-xs font-bold leading-none">${countAl}</span>` : ''}
                                 </button>
-                                <button onclick="apriModaleManutenzione('${v.id}', '${m.idMan}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                <button onclick="eliminaManutenzione('${v.id}', '${m.idMan}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md border border-transparent" title="Elimina"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                ${puoModificare('veicoli') ? `<button onclick="apriModaleManutenzione('${v.id}', '${m.idMan}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="eliminaManutenzione('${v.id}', '${m.idMan}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md border border-transparent" title="Elimina"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
                             ` : '<span class="text-xs text-slate-400 italic font-mono px-2 self-center">Calcolato dal sistema</span>'}
                             </div>
                         </td>
@@ -1095,9 +1171,9 @@
                                 <h3 class="font-bold text-slate-800 uppercase text-sm md:text-base">${v.marcaModello} <span class="text-xs font-mono text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded ml-2">${v.targa}</span></h3>
                             </div>
                         </div>
-                        <button onclick="apriModaleManutenzione('${v.id}')" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors shadow-sm">
+                        ${puoModificare('veicoli') ? `<button onclick="apriModaleManutenzione('${v.id}')" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors shadow-sm">
                             <i data-lucide="plus" class="w-3 h-3"></i> Aggiungi Intervento/Scadenza
-                        </button>
+                        </button>` : ''}
                     </div>
                     
                     <div class="p-3 md:p-4 bg-orange-50/30 border-b border-slate-100">
@@ -1207,8 +1283,8 @@
                 return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col relative">
                     <div class="absolute top-4 right-4 flex gap-1">
-                        <button onclick="apriModalePrestito('${p.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md" title="Modifica Finanziamento"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                        <button onclick="eliminaDoc('prestiti', '${p.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md" title="Elimina Finanziamento"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        ${puoModificare('prestiti') ? `<button onclick="apriModalePrestito('${p.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md" title="Modifica Finanziamento"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                        <button onclick="eliminaDoc('prestiti', '${p.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md" title="Elimina Finanziamento"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
                     </div>
                     <div class="flex items-center gap-3 mb-4 pr-16">
                         <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0"><i data-lucide="credit-card"></i></div>
@@ -1271,7 +1347,7 @@
         
         
         // ==========================================
-        // VISTA: AMMINISTRAZIONE
+        // VISTA: AMMINISTRAZIONE E GESTIONE UTENTI
         // ==========================================
         window.creaHtmlAmministrazione = () => {
             const utenteCorrente = auth.currentUser ? auth.currentUser.email : '';
@@ -1286,9 +1362,22 @@
 
             if (sub === 'Utenti') {
                 icon = 'users-cog';
+                const utentiDb = window.appState.dati.utenti || [];
+                
+                let righeUtenti = utentiDb.map(u => `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 ${u.ruolo === 'admin' ? 'bg-emerald-50/30' : ''}">
+                        <td class="py-3 px-4 font-bold text-slate-800">${window.escapeStr(u.email.split('@')[0])}<br><span class="text-xs font-normal text-slate-500">${window.escapeStr(u.email)}</span></td>
+                        <td class="py-3 px-4"><span class="${u.ruolo === 'admin' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'} px-2 py-1 rounded text-xs font-bold uppercase tracking-wide">${u.ruolo === 'admin' ? 'Super Admin' : 'User Standard'}</span></td>
+                        <td class="py-3 px-4 text-emerald-600 font-bold"><i data-lucide="check-circle" class="w-4 h-4 inline mr-1"></i>Attivo</td>
+                        <td class="py-3 px-4 text-right">
+                            ${u.ruolo === 'admin' ? '<span class="text-slate-400 text-xs italic">Proprietario</span>' : `<button onclick="apriModalePermessi('${u.email}')" class="text-slate-500 hover:text-blue-600 hover:bg-blue-50 p-1.5 border border-slate-200 rounded shadow-sm transition-colors" title="Gestisci Permessi"><i data-lucide="settings-2" class="w-4 h-4"></i></button>`}
+                        </td>
+                    </tr>
+                `).join('');
+
                 content = `
                     <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 text-sm text-blue-900">
-                        <strong>Controllo Accessi e Permessi:</strong> Gestisci chi può accedere al gestionale e cosa può visualizzare o modificare.
+                        <strong>Controllo Accessi e Permessi:</strong> Crea nuovi utenti e gestisci le sezioni che possono visualizzare o modificare.
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                         <table class="w-full text-left text-sm">
@@ -1301,31 +1390,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b border-slate-100 bg-emerald-50/30">
-                                    <td class="py-3 px-4 font-bold text-slate-800">Giuseppe Mastroiacovo<br><span class="text-xs font-normal text-slate-500">${ADMIN_EMAIL}</span></td>
-                                    <td class="py-3 px-4"><span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wide">Super Admin</span></td>
-                                    <td class="py-3 px-4 text-emerald-600 font-bold"><i data-lucide="check-circle" class="w-4 h-4 inline mr-1"></i>Attivo</td>
-                                    <td class="py-3 px-4 text-right text-slate-400 text-xs italic">Proprietario</td>
-                                </tr>
-                                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                                    <td class="py-3 px-4 font-bold text-slate-800">Valentina<br><span class="text-xs font-normal text-slate-500">valentina.gaudieri@famiglia.it</span></td>
-                                    <td class="py-3 px-4"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wide">User Standard</span></td>
-                                    <td class="py-3 px-4 text-emerald-600 font-bold"><i data-lucide="check-circle" class="w-4 h-4 inline mr-1"></i>Attivo</td>
-                                    <td class="py-3 px-4 text-right"><button class="text-slate-400 hover:text-blue-600 p-1 bg-slate-100 rounded" title="Gestisci Permessi"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>
-                                </tr>
+                                ${righeUtenti}
                             </tbody>
                         </table>
                         <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm"><i data-lucide="user-plus" class="w-4 h-4"></i> Invita Nuovo Utente</button>
+                            <button onclick="apriModaleNuovoUtente()" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm"><i data-lucide="user-plus" class="w-4 h-4"></i> Crea Nuovo Utente</button>
                         </div>
                     </div>
                 `;
             } else {
                 content = `
-                    <div class="flex flex-col items-center justify-center py-20 text-slate-400 text-center">
+                    <div class="flex flex-col items-center justify-center py-20 text-slate-400 text-center bg-white rounded-xl border border-slate-200 shadow-sm">
                         <i data-lucide="hammer" class="w-12 h-12 mb-4 text-slate-300"></i>
                         <h4 class="text-lg font-bold text-slate-600 mb-2">Modulo in costruzione</h4>
-                        <p class="text-sm max-w-md">L'infrastruttura per la sezione <strong>"${title}"</strong> è predisposta, ma le funzionalità di backend non sono ancora state agganciate.</p>
+                        <p class="text-sm max-w-md">L'infrastruttura per la sezione <strong>"${title}"</strong> è predisposta. Sarà attivata nei prossimi aggiornamenti del sistema.</p>
                     </div>
                 `;
             }
@@ -1339,7 +1417,161 @@
             `;
         };
 
+        // --- CREAZIONE NUOVO UTENTE (VIA SECONDARY APP PER NON SCONNETTERE ADMIN) ---
+        window.apriModaleNuovoUtente = () => {
+            apriModaleHTML('Crea Nuovo Utente', `
+                <form onsubmit="creaUtenteFirebase(event)" class="space-y-4"> 
+                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-200 text-xs text-amber-800 mb-4">
+                        <i data-lucide="info" class="w-4 h-4 inline mr-1 -mt-0.5"></i> L'utente verrà creato direttamente nel database sicuro e potrà fare login immediatamente.
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Email Utente</label>
+                        <input type="email" id="new-user-email" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" placeholder="es. mario@famiglia.it">
+                    </div> 
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Password Iniziale (min. 6 caratteri)</label>
+                        <input type="text" id="new-user-pass" required minlength="6" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" placeholder="••••••">
+                    </div> 
+                    <button type="submit" id="btn-crea-utente" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold hover:bg-blue-700 mt-2 shadow-sm transition-colors text-sm flex justify-center items-center gap-2">Crea Utente</button> 
+                </form>
+            `);
+        };
 
+        window.creaUtenteFirebase = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('new-user-email').value.trim();
+            const pass = document.getElementById('new-user-pass').value.trim();
+            const btn = document.getElementById('btn-crea-utente');
+            
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Elaborazione...';
+            btn.disabled = true;
+            lucide.createIcons();
+
+            try {
+                const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp_" + Date.now());
+                const secondaryAuth = initializeAuth(secondaryApp);
+                
+                let procediConPermessi = false;
+                
+                try {
+                    await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+                    procediConPermessi = true;
+                } catch (authErr) {
+                    if (authErr.code === 'auth/email-already-in-use') {
+                        console.log("Utente già in Auth, procedo a generare il profilo Firestore.");
+                        procediConPermessi = true; 
+                    } else {
+                        throw authErr; 
+                    }
+                }
+                
+                await signOut(secondaryAuth);
+                
+                if (procediConPermessi) {
+                    const sanitizedEmail = email.replace(/\./g, '_');
+                    const userRef = doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail);
+                    await setDoc(userRef, {
+                        email: email,
+                        ruolo: 'standard',
+                        permessi: {
+                            casa: { view: true, edit: false },
+                            veicoli: { view: true, edit: false },
+                            prestiti: { view: true, edit: false },
+                            cibo: { view: true, edit: false },
+                            note: { view: true, edit: false },
+                            calendario: { view: true, edit: true } 
+                        },
+                        ts: Date.now()
+                    });
+
+                    chiudiModale();
+                    mostraNotifica(`Profilo per ${email} configurato con successo!`, 'success');
+                }
+            } catch (error) {
+                console.error("Errore creazione utente:", error);
+                let msg = "Errore di connessione.";
+                if (error.code === 'auth/weak-password') msg = "La password deve essere di almeno 6 caratteri.";
+                if (error.message) msg = error.message;
+                mostraNotifica(msg, 'error');
+                btn.innerHTML = 'Crea Utente';
+                btn.disabled = false;
+            }
+        };
+
+        // --- GESTIONE PERMESSI UTENTE ---
+        window.apriModalePermessi = (email) => {
+            const sanitizedEmail = email.replace(/\./g, '_');
+            const u = window.appState.dati.utenti.find(x => x.id === sanitizedEmail);
+            if (!u) return;
+
+            const p = u.permessi || {};
+            
+            const renderToggle = (sezione, label) => {
+                const canView = p[sezione]?.view || false;
+                const canEdit = p[sezione]?.edit || false;
+                return `
+                <div class="flex flex-col md:flex-row md:items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg gap-2">
+                    <span class="font-bold text-sm text-slate-700 capitalize w-32">${label}</span>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="perm-view-${sezione}" ${canView ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                            <span class="text-xs font-semibold text-slate-600">Visualizza</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="perm-edit-${sezione}" ${canEdit ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+                            <span class="text-xs font-semibold text-slate-600">Modifica</span>
+                        </label>
+                    </div>
+                </div>
+                `;
+            };
+
+            apriModaleHTML(`Permessi per ${window.escapeStr(email)}`, `
+                <form onsubmit="salvaPermessi(event, '${sanitizedEmail}')" class="space-y-3"> 
+                    <div class="text-xs text-slate-500 mb-4 bg-blue-50 p-2 rounded border border-blue-100">
+                        <i data-lucide="info" class="w-3.5 h-3.5 inline mr-1 -mt-0.5"></i> Le modifiche avranno effetto al prossimo login dell'utente.
+                    </div>
+                    
+                    ${renderToggle('casa', 'Casa (Tutto)')}
+                    ${renderToggle('veicoli', 'Veicoli')}
+                    ${renderToggle('prestiti', 'Finanze / Mutui')}
+                    ${renderToggle('cibo', 'Alimenti e Spesa')}
+                    ${renderToggle('note', 'Blocco Note')}
+                    ${renderToggle('calendario', 'Calendario')}
+                    
+                    <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                        <button type="button" onclick="eliminaDoc('utenti', '${sanitizedEmail}')" class="bg-white border border-red-200 text-red-600 px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors hover:bg-red-50 flex items-center gap-2"><i data-lucide="user-x" class="w-4 h-4"></i> Elimina Utente</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Salva Permessi</button>
+                    </div>
+                </form>
+            `);
+        };
+
+        window.salvaPermessi = async (e, docId) => {
+            e.preventDefault();
+            
+            const getPerm = (sez) => ({
+                view: document.getElementById(`perm-view-${sez}`).checked,
+                edit: document.getElementById(`perm-edit-${sez}`).checked
+            });
+
+            const nuoviPermessi = {
+                casa: getPerm('casa'),
+                veicoli: getPerm('veicoli'),
+                prestiti: getPerm('prestiti'),
+                cibo: getPerm('cibo'),
+                note: getPerm('note'),
+                calendario: getPerm('calendario')
+            };
+
+            try {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'utenti', docId), { permessi: nuoviPermessi, ts: Date.now() });
+                chiudiModale();
+                mostraNotifica("Permessi aggiornati con successo!", "success");
+            } catch(error) {
+                mostraNotifica("Errore aggiornamento permessi", "error");
+            }
+        };
         // ==========================================
         // VISTA E LOGICA: CALENDARIO CONDIVISO
         // ==========================================
@@ -2283,7 +2515,7 @@
                     return `
                     <div id="spesa-${item.id}" draggable="true" ondragstart="dragSpesa(event, '${item.id}')" class="p-3 mb-2 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between cursor-move hover:border-blue-400 transition-colors gap-2 md:gap-0 ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
                         <div class="flex items-center gap-2 md:gap-3 flex-1 overflow-hidden">
-                            <input type="checkbox" onchange="toggleSpesaComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-5 h-5 text-rose-500 rounded border-slate-300 focus:ring-rose-500 cursor-pointer flex-shrink-0">
+                            <input type="checkbox" onchange="toggleSpesaComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-5 h-5 text-rose-500 rounded border-slate-300 focus:ring-rose-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
                             <button onclick="spostaSpesa('${item.id}', false)" class="md:hidden p-1.5 bg-slate-200 text-slate-600 rounded mr-1 flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>
                             
                             <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 pr-2">
@@ -2294,8 +2526,8 @@
                         <div class="flex items-center justify-between md:justify-end w-full md:w-auto pl-7 md:pl-0 gap-2">
                             <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà..." onblur="aggiornaQuantitaSpesa('${item.id}', this.value)" class="w-24 md:w-28 text-xs px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-rose-400 bg-slate-50 focus:bg-white transition-colors">
                             <div class="flex gap-1 ml-1 flex-shrink-0">
-                                <button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg transition-colors"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
-                                <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg transition-colors"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -2311,8 +2543,8 @@
                             </div>
                         </div>
                         <div class="flex gap-0.5 ml-1 flex-shrink-0">
-                            <button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                            ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                            <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
                         </div>
                     </div>`;
                 }
@@ -2546,7 +2778,7 @@
                     return `
                     <div id="det-${item.id}" draggable="true" ondragstart="dragDetersivo(event, '${item.id}')" class="p-3 mb-2 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between cursor-move hover:border-blue-400 transition-colors gap-2 md:gap-0 ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
                         <div class="flex items-center gap-2 md:gap-3 flex-1 overflow-hidden">
-                            <input type="checkbox" onchange="toggleDetersivoComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-5 h-5 text-teal-500 rounded border-slate-300 focus:ring-teal-500 cursor-pointer flex-shrink-0">
+                            <input type="checkbox" onchange="toggleDetersivoComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-5 h-5 text-teal-500 rounded border-slate-300 focus:ring-teal-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
                             <button onclick="spostaDetersivo('${item.id}', false)" class="md:hidden p-1.5 bg-slate-200 text-slate-600 rounded mr-1 flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>
                             
                             <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 pr-2">
@@ -2557,8 +2789,8 @@
                         <div class="flex items-center justify-between md:justify-end w-full md:w-auto pl-7 md:pl-0 gap-2">
                             <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà..." onblur="aggiornaQuantitaDetersivo('${item.id}', this.value)" class="w-24 md:w-28 text-xs px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-teal-400 bg-slate-50 focus:bg-white transition-colors">
                             <div class="flex gap-1 ml-1 flex-shrink-0">
-                                <button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg transition-colors"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
-                                <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg transition-colors"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -2574,8 +2806,8 @@
                             </div>
                         </div>
                         <div class="flex gap-0.5 ml-1 flex-shrink-0">
-                            <button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                            ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                            <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
                         </div>
                     </div>`;
                 }
@@ -2763,16 +2995,16 @@
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative group transition-all hover:shadow-md">
                     <div class="bg-slate-800 p-3 flex justify-between items-center text-white">
                         <h4 class="font-bold text-sm tracking-wide uppercase flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4 text-slate-300"></i> ${giorno}</h4>
-                        <button onclick="svuotaMenuDay('${giorno}', '${idDoc}')" class="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-red-400" title="Svuota campi di ${giorno}"><i data-lucide="eraser" class="w-4 h-4"></i></button>
+                        ${puoModificare('cibo') ? `<button onclick="svuotaMenuDay('${giorno}', '${idDoc}')" class="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-red-400" title="Svuota campi di ${giorno}"><i data-lucide="eraser" class="w-4 h-4"></i></button>` : ''}
                     </div>
                     <div class="p-4 flex-1 flex flex-col gap-4">
                         <div>
                             <span class="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 block">Pranzo</span>
-                            <textarea onblur="salvaMenuDayDiretto('${giorno}', '${idDoc}', 'pranzo', this.value)" class="w-full text-sm font-medium text-slate-700 bg-orange-50 p-2.5 rounded-lg border border-orange-200 min-h-[4rem] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 resize-none transition-all placeholder:font-normal placeholder:italic placeholder:text-slate-400" placeholder="Tocca per scrivere...">${window.escapeStr(dayData.pranzo)}</textarea>
+                            <textarea onblur="salvaMenuDayDiretto('${giorno}', '${idDoc}', 'pranzo', this.value)" class="w-full text-sm font-medium text-slate-700 bg-orange-50 p-2.5 rounded-lg border border-orange-200 min-h-[4rem] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 resize-none transition-all placeholder:font-normal placeholder:italic placeholder:text-slate-400" placeholder="Tocca per scrivere..." ${!window.puoModificare('cibo') ? 'readonly' : ''}>${window.escapeStr(dayData.pranzo)}</textarea>
                         </div>
                         <div>
                             <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1 block">Cena</span>
-                            <textarea onblur="salvaMenuDayDiretto('${giorno}', '${idDoc}', 'cena', this.value)" class="w-full text-sm font-medium text-slate-700 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 min-h-[4rem] outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none transition-all placeholder:font-normal placeholder:italic placeholder:text-slate-400" placeholder="Tocca per scrivere...">${window.escapeStr(dayData.cena)}</textarea>
+                            <textarea onblur="salvaMenuDayDiretto('${giorno}', '${idDoc}', 'cena', this.value)" class="w-full text-sm font-medium text-slate-700 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 min-h-[4rem] outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none transition-all placeholder:font-normal placeholder:italic placeholder:text-slate-400" placeholder="Tocca per scrivere..." ${!window.puoModificare('cibo') ? 'readonly' : ''}>${window.escapeStr(dayData.cena)}</textarea>
                         </div>
                     </div>
                 </div>
@@ -3036,8 +3268,8 @@
                         <button onclick="apriModaleAllegati('cibo_ricette', '${r.id}', 'Foto Ricetta ${window.escapeStr(r.nome)}')" class="${countAl > 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-50 text-slate-400 hover:text-orange-600 hover:bg-orange-50 border-slate-100'} transition-colors p-1.5 rounded-md border flex items-center gap-1" title="Foto Ricetta">
                             <i data-lucide="image" class="w-3.5 h-3.5"></i> ${countAl > 0 ? `<span class="text-[10px] font-bold leading-none">${countAl}</span>` : ''}
                         </button>
-                        <button onclick="apriModaleRicetta('${r.id}')" class="bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100 transition-colors p-1.5 rounded-md" title="Modifica"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
-                        <button onclick="eliminaDoc('cibo_ricette', '${r.id}')" class="bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-100 transition-colors p-1.5 rounded-md" title="Elimina"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        ${puoModificare('cibo') ? `<button onclick="apriModaleRicetta('${r.id}')" class="bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100 transition-colors p-1.5 rounded-md" title="Modifica"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="eliminaDoc('cibo_ricette', '${r.id}')" class="bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-100 transition-colors p-1.5 rounded-md" title="Elimina"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                     </div>
                     
                     <h3 class="font-bold text-lg text-slate-800 mb-3 pr-24 leading-tight">${window.escapeStr(r.nome)}</h3>
@@ -3046,9 +3278,9 @@
                         <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Ingredienti</h4>
                         <div class="mb-4">
                             <p class="text-sm font-medium text-slate-600 whitespace-pre-wrap bg-slate-50 p-2 rounded-t border border-slate-100">${window.escapeStr(r.ingredienti)}</p>
-                            <button onclick="apriModaleIntegrazioneSpesa('${r.id}')" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border-x border-b border-rose-200 py-2 rounded-b text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+                            ${puoModificare('cibo') ? `<button onclick="apriModaleIntegrazioneSpesa('${r.id}')" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border-x border-b border-rose-200 py-2 rounded-b text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
                                 <i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i> Aggiungi alla Spesa
-                            </button>
+                            </button>` : ''}
                         </div>
                         
                         ${r.procedimento ? `
@@ -3152,8 +3384,8 @@
                             <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
                             ${countAl > 0 ? `<span class="text-[10px] font-bold leading-none">${countAl}</span>` : ''}
                         </button>
-                        <button onclick="apriModaleNota('${n.id}')" class="bg-white text-slate-500 hover:text-amber-600 hover:bg-amber-50 shadow-sm transition-colors p-1.5 rounded-md border border-slate-200" title="Modifica Nota"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
-                        <button onclick="eliminaDoc('note', '${n.id}')" class="bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 shadow-sm transition-colors p-1.5 rounded-md border border-slate-200" title="Elimina Nota"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        ${puoModificare('note') ? `<button onclick="apriModaleNota('${n.id}')" class="bg-white text-slate-500 hover:text-amber-600 hover:bg-amber-50 shadow-sm transition-colors p-1.5 rounded-md border border-slate-200" title="Modifica Nota"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="eliminaDoc('note', '${n.id}')" class="bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 shadow-sm transition-colors p-1.5 rounded-md border border-slate-200" title="Elimina Nota"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                     </div>
                     
                     <h3 class="font-bold text-base text-slate-800 mb-2 pr-16 break-words leading-tight">${window.escapeStr(n.titolo)}</h3>
@@ -3205,19 +3437,23 @@
 
         window.eliminaDoc = (collezione, id) => {
             window.chiediConferma("Sei sicuro di voler eliminare questo elemento?", async () => {
-                let refStr = '';
-                if (collezione === 'casa') refStr = 'scadenze_casa';
-                if (collezione === 'veicoli') refStr = 'veicoli';
-                if (collezione === 'prestiti') refStr = 'prestiti';
-                if (collezione === 'note') refStr = 'note';
-                if (collezione === 'cibo_spesa') refStr = 'cibo_spesa';
-                if (collezione === 'cibo_menu') refStr = 'cibo_menu';
-                if (collezione === 'cibo_ricette') refStr = 'cibo_ricette';
-                if (collezione === 'cibo_menu_salvati') refStr = 'cibo_menu_salvati';
-                if (collezione === 'detersivi') refStr = 'detersivi';
-                if (collezione === 'calendario') refStr = 'calendario';
                 try {
-                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, refStr, id));
+                    if (collezione === 'utenti') {
+                        await deleteDoc(doc(db, 'artifacts', APP_ID, 'utenti', id));
+                    } else {
+                        let refStr = '';
+                        if (collezione === 'casa') refStr = 'scadenze_casa';
+                        if (collezione === 'veicoli') refStr = 'veicoli';
+                        if (collezione === 'prestiti') refStr = 'prestiti';
+                        if (collezione === 'note') refStr = 'note';
+                        if (collezione === 'cibo_spesa') refStr = 'cibo_spesa';
+                        if (collezione === 'cibo_menu') refStr = 'cibo_menu';
+                        if (collezione === 'cibo_ricette') refStr = 'cibo_ricette';
+                        if (collezione === 'cibo_menu_salvati') refStr = 'cibo_menu_salvati';
+                        if (collezione === 'detersivi') refStr = 'detersivi';
+                        if (collezione === 'calendario') refStr = 'calendario';
+                        await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, refStr, id));
+                    }
                     mostraNotifica("Elemento eliminato", "success");
                 } catch (e) {
                     mostraNotifica("Errore durante l'eliminazione", "error");
