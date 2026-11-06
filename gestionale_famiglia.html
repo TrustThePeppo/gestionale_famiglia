@@ -288,7 +288,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { initializeAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Inizializza Icone Iniziali
         lucide.createIcons();
@@ -330,7 +330,8 @@
                 cibo_menu_salvati: [],
                 detersivi: [],
                 calendario: [],
-                utenti: []
+                utenti: [],
+                audit_logs: []
             },
             allegatiAperti: { idTarget: null, collezione: null }
         };
@@ -368,6 +369,20 @@
         window.escapeStr = (str) => {
             if (!str) return '';
             return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        };
+
+        
+        window.registraAudit = async (azione, dettaglio) => {
+            if (!auth.currentUser) return;
+            try {
+                const userMail = auth.currentUser.email;
+                await addDoc(collection(db, 'artifacts', APP_ID, 'audit_logs'), {
+                    email: userMail,
+                    azione: azione,
+                    dettaglio: dettaglio,
+                    ts: Date.now()
+                });
+            } catch(e) { console.error("Errore audit:", e); }
         };
 
         // --- GESTIONE MENU MOBILE ---
@@ -472,6 +487,11 @@
                     loginScreen.classList.remove('flex');
                     if (wrapper) wrapper.style.display = '';
                     
+                    // Aggiorna sessione
+                    const sEmail = user.email.replace(/\./g, '_');
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'utenti', sEmail), { ultima_sessione: Date.now() }).catch(e => console.log('Update session skip'));
+
+                    
                     // Sblocco menu admin solo per l'amministratore
                     if (user.email === ADMIN_EMAIL) {
                         document.getElementById('nav-amministrazione').classList.remove('hidden');
@@ -561,6 +581,14 @@
                     window.appState.dati.utenti = [];
                     snap.forEach(d => window.appState.dati.utenti.push({ id: d.id, ...d.data() }));
                     if (window.appState.vistaAttuale === 'admin') renderizzaContenuto();
+                });
+                
+                refs.audit_logs = collection(db, 'artifacts', APP_ID, 'audit_logs');
+                const qLogs = query(refs.audit_logs, orderBy('ts', 'desc'), limit(100));
+                onSnapshot(qLogs, (snap) => {
+                    window.appState.dati.audit_logs = [];
+                    snap.forEach(d => window.appState.dati.audit_logs.push({ id: d.id, ...d.data() }));
+                    if (window.appState.vistaAttuale === 'admin' && window.appState.sottoCategoria === 'Audit Log') renderizzaContenuto();
                 });
             }
 
@@ -1398,6 +1426,85 @@
                         </div>
                     </div>
                 `;
+            } else if (sub === 'Sessioni') {
+                icon = 'activity';
+                const utentiDb = window.appState.dati.utenti || [];
+                const now = Date.now();
+                
+                let righeSessioni = utentiDb.sort((a,b) => (b.ultima_sessione || 0) - (a.ultima_sessione || 0)).map(u => {
+                    const lastLogin = u.ultima_sessione ? new Date(u.ultima_sessione) : null;
+                    const diffMin = lastLogin ? Math.floor((now - lastLogin.getTime()) / 60000) : 999999;
+                    
+                    let statusHtml = '<span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold uppercase tracking-wide">Offline</span>';
+                    if (diffMin < 60) {
+                        statusHtml = '<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"><span class="w-2 h-2 inline-block bg-emerald-500 rounded-full mr-1 animate-pulse"></span>Online / Recente</span>';
+                    }
+                    
+                    const timeStr = lastLogin ? lastLogin.toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Mai loggato';
+                    
+                    return `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                        <td class="py-3 px-4 font-bold text-slate-800">${window.escapeStr(u.email.split('@')[0])}</td>
+                        <td class="py-3 px-4 text-slate-600 font-medium">${timeStr}</td>
+                        <td class="py-3 px-4">${statusHtml}</td>
+                    </tr>
+                    `;
+                }).join('');
+
+                content = `
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4">Utente</th>
+                                    <th class="py-3 px-4">Ultimo Accesso</th>
+                                    <th class="py-3 px-4">Stato Dispositivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${righeSessioni}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else if (sub === 'Audit Log') {
+                icon = 'history';
+                const logs = window.appState.dati.audit_logs || [];
+                
+                let righeLogs = logs.map(l => {
+                    const timeStr = new Date(l.ts).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    let badgeCol = 'bg-slate-100 text-slate-700';
+                    if (l.azione === 'Creazione') badgeCol = 'bg-emerald-100 text-emerald-800';
+                    if (l.azione === 'Modifica') badgeCol = 'bg-blue-100 text-blue-800';
+                    if (l.azione === 'Eliminazione') badgeCol = 'bg-red-100 text-red-800';
+
+                    return `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                        <td class="py-3 px-4 text-slate-500 font-mono text-xs whitespace-nowrap">${timeStr}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-700">${window.escapeStr(l.email.split('@')[0])}</td>
+                        <td class="py-3 px-4"><span class="${badgeCol} px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${window.escapeStr(l.azione)}</span></td>
+                        <td class="py-3 px-4 text-slate-600 text-xs">${window.escapeStr(l.dettaglio)}</td>
+                    </tr>
+                    `;
+                }).join('');
+
+                content = `
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden max-h-[70vh] overflow-y-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 shadow-sm">
+                                <tr>
+                                    <th class="py-3 px-4">Data e Ora</th>
+                                    <th class="py-3 px-4">Utente</th>
+                                    <th class="py-3 px-4">Azione</th>
+                                    <th class="py-3 px-4 w-1/2">Dettaglio Log</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${righeLogs || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Nessun log registrato di recente.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
             } else {
                 content = `
                     <div class="flex flex-col items-center justify-center py-20 text-slate-400 text-center bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -2001,8 +2108,13 @@
                 importo: document.getElementById('m-importo').value, 
                 ts: Date.now() 
             };
-            if (idStr) await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', idStr), data);
-            else await addDoc(refs.casa, data); 
+            if (idStr) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', idStr), data);
+                window.registraAudit('Modifica', `Modificata scadenza casa: ${data.titolo}`);
+            } else {
+                await addDoc(refs.casa, data); 
+                window.registraAudit("Creazione", `Nuova scadenza casa: ${data.titolo}`);
+            }
             chiudiModale(); 
             mostraNotifica("Salvato con successo", "success"); 
         };
@@ -3455,6 +3567,7 @@
                         await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, refStr, id));
                     }
                     mostraNotifica("Elemento eliminato", "success");
+                    window.registraAudit('Eliminazione', `Eliminato record da collezione: ${collezione}`);
                 } catch (e) {
                     mostraNotifica("Errore durante l'eliminazione", "error");
                 }
