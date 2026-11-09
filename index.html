@@ -44,6 +44,13 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .toast-enter { animation: toastIn 0.3s ease-out forwards; }
         @keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+            @media (max-width: 767px) {
+            .mobile-flip-container { perspective: 1000px; }
+            .mobile-flipper { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; position: relative; width: 100%; height: 100%; }
+            .mobile-flipper.is-flipped { transform: rotateY(-180deg); }
+            .mobile-front, .mobile-back { backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+            .mobile-back { transform: rotateY(180deg); }
+        }
     </style>
 </head>
 <body class="h-screen overflow-hidden flex font-sans text-slate-800">
@@ -415,6 +422,11 @@
                 setTimeout(() => overlay.classList.add('opacity-100'), 10);
                 sidebar.classList.remove('-translate-x-full');
             }
+        };
+
+                window.toggleFlip = (id) => {
+            const el = document.getElementById(id);
+            if(el) el.classList.toggle('is-flipped');
         };
 
         // --- SISTEMA DI NOTIFICHE ---
@@ -2795,52 +2807,72 @@
                 window.CATEGORIE_SPESA.forEach(cat => {
                     const groupItems = itemsList.filter(i => (i.categoria || 'Varie') === cat);
                     if (groupItems.length > 0) {
-                        htmlStr += `<div class="mb-4">
-                            <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">${cat}</h5>
-                            <div class="${gridClass}">
-                                ${groupItems.map(i => renderItem(i, isInLista)).join('')}
-                            </div>
-                        </div>`;
+                        if (isInLista) {
+                            htmlStr += groupItems.map(i => renderItem(i, isInLista)).join('');
+                        } else {
+                            htmlStr += `<div class="mb-4">
+                                <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">${cat}</h5>
+                                <div class="${gridClass}">
+                                    ${groupItems.map(i => renderItem(i, isInLista)).join('')}
+                                </div>
+                            </div>`;
+                        }
                     }
                 });
                 
                 const unknownItems = itemsList.filter(i => !window.CATEGORIE_SPESA.includes(i.categoria || 'Varie'));
                 if (unknownItems.length > 0) {
-                    htmlStr += `<div class="mb-4">
-                            <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">Altro</h5>
-                            <div class="${gridClass}">
-                                ${unknownItems.map(i => renderItem(i, isInLista)).join('')}
-                            </div>
-                        </div>`;
+                    if (isInLista) {
+                        htmlStr += unknownItems.map(i => renderItem(i, isInLista)).join('');
+                    } else {
+                        htmlStr += `<div class="mb-4">
+                                <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">Altro</h5>
+                                <div class="${gridClass}">
+                                    ${unknownItems.map(i => renderItem(i, isInLista)).join('')}
+                                </div>
+                            </div>`;
+                    }
+                }
+                
+                if (isInLista) {
+                    return `<div class="${gridClass}">${htmlStr}</div>`;
                 }
                 return htmlStr;
             };
 
             return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-2 h-[75vh] md:h-auto">
-                <!-- COLONNA CALDERONE -->
-                <div class="bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
-                    <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa</h4>
-                            <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
-                            <p class="text-[11px] text-slate-500 mt-1 md:hidden">Tocca la freccia per spostare in lista.</p>
+            <div class="mt-2 h-[75vh] md:h-auto mobile-flip-container md:grid md:grid-cols-2 md:gap-4 lg:gap-6">
+                <div class="mobile-flipper md:contents" id="spesa-flipper">
+                    <!-- FRONTE: COLONNA CALDERONE -->
+                    <div class="mobile-front bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
+                        <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa</h4>
+                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
+                            </div>
+                            <button onclick="toggleFlip('spesa-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-slate-300 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none">
+                                Carrello <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        <div class="p-3 flex-1 overflow-y-auto" ondrop="dropSpesa(event, false)" ondragover="allowDropSpesa(event)">
+                            ${calderone.length > 0 ? renderGrouped(calderone, false, 'grid grid-cols-2 gap-x-2 content-start') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Usa "Aggiungi" per creare le tue voci abituali.</p>'}
                         </div>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto" ondrop="dropSpesa(event, false)" ondragover="allowDropSpesa(event)">
-                        ${calderone.length > 0 ? renderGrouped(calderone, false, 'grid grid-cols-2 gap-x-2 content-start') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Usa "Aggiungi" per creare le tue voci abituali.</p>'}
-                    </div>
-                </div>
 
-                <!-- COLONNA IN LISTA -->
-                <div class="bg-rose-50 rounded-xl border border-rose-200 flex flex-col h-full overflow-hidden shadow-inner">
-                    <div class="bg-rose-100 p-3 border-b border-rose-200">
-                        <h4 class="font-bold text-rose-800 text-sm flex items-center gap-2"><i data-lucide="shopping-cart" class="w-4 h-4"></i> Da Comprare</h4>
-                        <p class="text-[11px] text-rose-600 mt-1 hidden md:block">Trascina qui gli alimenti da comprare.</p>
-                        <p class="text-[11px] text-rose-600 mt-1 md:hidden">La tua lista attuale.</p>
-                    </div>
-                    <div class="p-3 flex-1 overflow-y-auto" ondrop="dropSpesa(event, true)" ondragover="allowDropSpesa(event)">
-                        ${inLista.length > 0 ? renderGrouped(inLista, true, 'block') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-rose-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-rose-400 font-medium">Nessun articolo in lista</p></div>'}
+                    <!-- RETRO: COLONNA IN LISTA -->
+                    <div class="mobile-back bg-rose-50 rounded-xl border border-rose-200 flex flex-col h-full overflow-hidden shadow-inner">
+                        <div class="bg-rose-100 p-3 border-b border-rose-200 flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-rose-800 text-sm flex items-center gap-2"><i data-lucide="shopping-cart" class="w-4 h-4"></i> Carrello</h4>
+                                <p class="text-[11px] text-rose-600 mt-1 hidden md:block">Trascina qui gli alimenti da comprare.</p>
+                            </div>
+                            <button onclick="toggleFlip('spesa-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-rose-200 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors focus:outline-none">
+                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i> Dispensa
+                            </button>
+                        </div>
+                        <div class="p-3 flex-1 overflow-y-auto" ondrop="dropSpesa(event, true)" ondragover="allowDropSpesa(event)">
+                            ${inLista.length > 0 ? renderGrouped(inLista, true, 'block') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-rose-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-rose-400 font-medium">Nessun articolo in lista</p></div>'}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3052,28 +3084,38 @@
             };
 
             return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-2 h-[75vh] md:h-auto">
-                <div class="bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
-                    <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa Detersivi</h4>
-                            <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
-                            <p class="text-[11px] text-slate-500 mt-1 md:hidden">Tocca la freccia per spostare in lista.</p>
+            <div class="mt-2 h-[75vh] md:h-auto mobile-flip-container md:grid md:grid-cols-2 md:gap-4 lg:gap-6">
+                <div class="mobile-flipper md:contents" id="detersivi-flipper">
+                    <!-- FRONTE -->
+                    <div class="mobile-front bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
+                        <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa</h4>
+                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
+                            </div>
+                            <button onclick="toggleFlip('detersivi-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-slate-300 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none">
+                                Carrello <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        <div class="p-3 flex-1 overflow-y-auto ${calderone.length > 0 ? 'grid grid-cols-2 gap-x-2 content-start' : ''}" ondrop="dropDetersivo(event, false)" ondragover="allowDropDetersivo(event)">
+                            ${calderone.length > 0 ? calderone.map(i => renderItem(i, false)).join('') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Aggiungi i tuoi detersivi abituali.</p>'}
                         </div>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto ${calderone.length > 0 ? 'grid grid-cols-2 gap-x-2 content-start' : ''}" ondrop="dropDetersivo(event, false)" ondragover="allowDropDetersivo(event)">
-                        ${calderone.length > 0 ? calderone.map(i => renderItem(i, false)).join('') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Aggiungi i tuoi detersivi abituali.</p>'}
-                    </div>
-                </div>
 
-                <div class="bg-teal-50 rounded-xl border border-teal-200 flex flex-col h-full overflow-hidden shadow-inner">
-                    <div class="bg-teal-100 p-3 border-b border-teal-200">
-                        <h4 class="font-bold text-teal-800 text-sm flex items-center gap-2"><i data-lucide="shopping-cart" class="w-4 h-4"></i> Da Comprare</h4>
-                        <p class="text-[11px] text-teal-600 mt-1 hidden md:block">Trascina qui i prodotti da comprare.</p>
-                        <p class="text-[11px] text-teal-600 mt-1 md:hidden">La tua lista attuale.</p>
-                    </div>
-                    <div class="p-3 flex-1 overflow-y-auto" ondrop="dropDetersivo(event, true)" ondragover="allowDropDetersivo(event)">
-                        ${inLista.length > 0 ? inLista.map(i => renderItem(i, true)).join('') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-teal-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-teal-500 font-medium">Nessun detersivo in lista</p></div>'}
+                    <!-- RETRO -->
+                    <div class="mobile-back bg-teal-50 rounded-xl border border-teal-200 flex flex-col h-full overflow-hidden shadow-inner">
+                        <div class="bg-teal-100 p-3 border-b border-teal-200 flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-teal-800 text-sm flex items-center gap-2"><i data-lucide="shopping-cart" class="w-4 h-4"></i> Carrello</h4>
+                                <p class="text-[11px] text-teal-600 mt-1 hidden md:block">Trascina qui i prodotti da comprare.</p>
+                            </div>
+                            <button onclick="toggleFlip('detersivi-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-teal-200 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 hover:bg-teal-50 transition-colors focus:outline-none">
+                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i> Dispensa
+                            </button>
+                        </div>
+                        <div class="p-3 flex-1 overflow-y-auto" ondrop="dropDetersivo(event, true)" ondragover="allowDropDetersivo(event)">
+                            ${inLista.length > 0 ? inLista.map(i => renderItem(i, true)).join('') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-teal-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-teal-500 font-medium">Nessun detersivo in lista</p></div>'}
+                        </div>
                     </div>
                 </div>
             </div>
