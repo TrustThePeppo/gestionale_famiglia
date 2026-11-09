@@ -910,7 +910,7 @@
 
             // 1. Scansione Scadenze Casa (Rate Condominio, Verbali, Rendiconti, Caldaia, TARI, Varie)
             window.appState.dati.scadenze_casa.forEach(s => {
-                if (s.data) {
+                if (s.data && !s.completato) {
                     const dataScad = new Date(s.data);
                     dataScad.setHours(0, 0, 0, 0);
                     if (dataScad <= limite40Giorni) {
@@ -922,19 +922,21 @@
                             data: s.data,
                             dataObj: dataScad,
                             giorniMancanti: diffDays,
-                            importo: s.importo
+                            importo: s.importo,
+                            idRef: s.id,
+                            collezione: 'casa'
                         });
                     }
                 }
             });
 
-            // 2. Scansione Scadenze Veicoli (Bollo, Assicurazione, Revisione, Tagliando stimato, Inversione/Sostituzione Pneumatici)
+            // 2. Scansione Scadenze Veicoli
             const tipiScadenzeDirette = ['Scadenza Bollo', 'Scadenza Assicurazione', 'Scadenza Revisione'];
             window.appState.dati.veicoli.forEach(v => {
                 if (v.manutenzioni && Array.isArray(v.manutenzioni)) {
                     // Scadenze dirette
                     v.manutenzioni.forEach(m => {
-                        if (tipiScadenzeDirette.includes(m.tipoIntervento) && m.data) {
+                        if (tipiScadenzeDirette.includes(m.tipoIntervento) && m.data && !m.completato) {
                             const dataScad = new Date(m.data);
                             dataScad.setHours(0, 0, 0, 0);
                             if (dataScad <= limite40Giorni) {
@@ -945,7 +947,10 @@
                                     data: m.data,
                                     dataObj: dataScad,
                                     giorniMancanti: diffDays,
-                                    importo: m.importo
+                                    importo: m.importo,
+                                    idRef: v.id,
+                                    subId: m.idMan,
+                                    collezione: 'veicoli'
                                 });
                             }
                         }
@@ -953,7 +958,7 @@
 
                     const interventi = v.manutenzioni.filter(m => !tipiScadenzeDirette.includes(m.tipoIntervento));
 
-                    // Prossimo Tagliando Stimato (+1 anno dall'ultimo)
+                    // Prossimo Tagliando Stimato
                     const tagliandi = interventi.filter(m => m.tipoIntervento === 'Tagliando' && m.data).sort((a, b) => new Date(b.data) - new Date(a.data));
                     if (tagliandi.length > 0) {
                         const d = new Date(tagliandi[0].data);
@@ -967,12 +972,14 @@
                                 data: d.toISOString().split('T')[0],
                                 dataObj: d,
                                 giorniMancanti: diffDays,
-                                importo: ''
+                                importo: '',
+                                idRef: v.id,
+                                collezione: 'veicoli_virtuale'
                             });
                         }
                     }
 
-                    // Prossima Inversione Pneumatici (da Inversione o Sostituzione Pneumatici)
+                    // Prossima Inversione Pneumatici
                     const inversioni = interventi.filter(m => (m.tipoIntervento === 'Inversione Pneumatici' || m.tipoIntervento === 'Sostituzione Pneumatici') && m.dataProssima);
                     inversioni.forEach(inv => {
                         const d = new Date(inv.dataProssima);
@@ -985,14 +992,15 @@
                                 data: inv.dataProssima,
                                 dataObj: d,
                                 giorniMancanti: diffDays,
-                                importo: ''
+                                importo: '',
+                                idRef: v.id,
+                                collezione: 'veicoli_virtuale'
                             });
                         }
                     });
                 }
             });
 
-            
             // 3. Scansione Calendario Condiviso (Eventi con Alert)
             if (window.appState.dati.calendario) {
                 window.appState.dati.calendario.forEach(ev => {
@@ -1002,7 +1010,6 @@
                         const diffDays = Math.ceil((dataInizio - oggi) / (1000 * 60 * 60 * 24));
                         const alertThreshold = parseInt(ev.alert_days) || 1;
                         
-                        // Mostra in bacheca se i giorni mancanti sono <= alla soglia scelta, e non è passato da più di 3 giorni
                         if (diffDays <= alertThreshold && diffDays >= -3) {
                             let org = 'Agenda: Famiglia';
                             if (ev.colore === 'bg-blue-500') org = 'Agenda: Mommino';
@@ -1018,7 +1025,9 @@
                                 data: ev.data,
                                 dataObj: dataInizio,
                                 giorniMancanti: diffDays,
-                                importo: ''
+                                importo: '',
+                                idRef: ev.id,
+                                collezione: 'calendario'
                             });
                         }
                     }
@@ -1048,7 +1057,47 @@
                             const statusText = isScaduta 
                                 ? `Scaduta da ${Math.abs(item.giorniMancanti)} gg` 
                                 : (isOggi ? 'Scade OGGI!' : `Tra ${item.giorniMancanti} giorni`);
+                                
+                            let btnAzione = '';
+                            if (item.collezione === 'veicoli_virtuale') {
+                                btnAzione = puoModificare('veicoli') ? `<button onclick="apriModaleManutenzione('${item.idRef}')" class="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors border border-blue-200 shadow-sm flex-shrink-0" title="Registra nuovo intervento per aggiornare il calcolo"><i data-lucide="wrench" class="w-4 h-4"></i></button>` : '';
+                            } else {
+                                const permCat = item.collezione === 'casa' ? 'casa' : (item.collezione === 'calendario' ? 'calendario' : 'veicoli');
+                                btnAzione = puoModificare(permCat) ? `<button onclick="segnaAllertCompletato('${item.collezione}', '${item.idRef}', '${item.subId || ''}')" class="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg transition-colors border border-emerald-200 shadow-sm flex-shrink-0" title="Risolto / Pagato: Rimuovi dalla bacheca"><i data-lucide="check-check" class="w-4 h-4"></i></button>` : '';
+                            }
+                            
                             return `
+                            <div class="bg-white rounded-xl p-3 border border-orange-200/80 flex flex-col md:flex-row md:items-center justify-between gap-2 shadow-sm group">
+                                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+                                    <span class="inline-block w-fit text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${badgeColor}">${item.origine}</span>
+                                    <span class="font-semibold text-slate-800 text-sm">${item.descrizione}</span>
+                                    ${item.importo ? `<span class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded w-fit">€ ${parseFloat(item.importo).toFixed(2)}</span>` : ''}
+                                </div>
+                                <div class="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
+                                    <span class="text-xs font-semibold ${isScaduta ? 'text-red-600' : 'text-orange-600'}">${statusText}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-sm px-2.5 py-1 rounded-lg ${isScaduta ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}">${window.formattaDataIT(item.data)}</span>
+                                        ${btnAzione}
+                                    </div>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                `;
+            } else {
+                alertBannerHtml = `
+                <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-8 flex items-center gap-3 text-emerald-800">
+                    <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-600 flex-shrink-0"></i>
+                    <div class="text-sm">
+                        <span class="font-bold">Tutto sotto controllo!</span> Nessuna scadenza imminente rilevata nei prossimi 40 giorni.
+                    </div>
+                </div>
+                `;
+            }
+
+            return `
                             <div class="bg-white rounded-xl p-3 border border-orange-200/80 flex flex-col md:flex-row md:items-center justify-between gap-2 shadow-sm">
                                 <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
                                     <span class="inline-block w-fit text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${badgeColor}">${item.origine}</span>
@@ -3958,7 +4007,38 @@
             });
         };
 
+
+        window.segnaAllertCompletato = async (collezione, id, subId) => {
+            const permCat = collezione === 'casa' ? 'casa' : (collezione === 'calendario' ? 'calendario' : 'veicoli');
+            if (!window.puoModificare(permCat)) {
+                return mostraNotifica("Non hai i permessi per questa operazione.", "error");
+            }
+            
+            try {
+                if (collezione === 'casa') {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', id), { completato: true });
+                } else if (collezione === 'calendario') {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'calendario', id), { alert: false });
+                } else if (collezione === 'veicoli') {
+                    const v = window.appState.dati.veicoli.find(x => x.id === id);
+                    if (v && v.manutenzioni) {
+                        const nuoveMan = [...v.manutenzioni];
+                        const idx = nuoveMan.findIndex(m => m.idMan === subId);
+                        if (idx > -1) {
+                            nuoveMan[idx].completato = true;
+                            await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', id), { manutenzioni: nuoveMan });
+                        }
+                    }
+                }
+                mostraNotifica("Avviso rimosso dal Quadro Generale!", "success");
+            } catch(e) {
+                console.error(e);
+                mostraNotifica("Errore durante l'aggiornamento", "error");
+            }
+        };
+
         avviaApp();
+
     </script>
 </body>
 </html>
