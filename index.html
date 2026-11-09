@@ -3681,7 +3681,7 @@
             }).join('') + `</div>`;
         };
 
-        let html5QrcodeScanner = null;
+        let html5Qrcode = null;
 
         window.apriModaleTessera = (id = null) => {
             let t = { nome: '', codice: '', colore: '#3b82f6' };
@@ -3722,26 +3722,40 @@
         };
 
         window.avviaScanner = () => {
-            document.getElementById('reader').innerHTML = '';
-            if(html5QrcodeScanner) {
-                try { html5QrcodeScanner.clear(); } catch(e){}
+            document.getElementById('reader').innerHTML = '<div class="text-center py-6 text-indigo-400"><i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2"></i><p class="text-xs font-semibold">Avvio fotocamera in corso...</p></div>';
+            lucide.createIcons();
+            
+            if (html5Qrcode) {
+                try { html5Qrcode.stop(); } catch(e){}
             }
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 100}, aspectRatio: 1.5 }, false);
-            html5QrcodeScanner.render((decodedText, decodedResult) => {
-                document.getElementById('tes-codice').value = decodedText;
-                mostraNotifica("Codice letto con successo!", "success");
-                html5QrcodeScanner.clear();
-            }, (error) => {
-                // Ignore silent errors during scanning
+            
+            html5Qrcode = new Html5Qrcode("reader");
+            
+            html5Qrcode.start(
+                { facingMode: "environment" }, // Forza la fotocamera posteriore
+                { fps: 10, qrbox: { width: 250, height: 100 }, aspectRatio: 1.5 },
+                (decodedText) => {
+                    document.getElementById('tes-codice').value = decodedText;
+                    mostraNotifica("Codice letto con successo!", "success");
+                    html5Qrcode.stop().then(() => {
+                        document.getElementById('reader').innerHTML = '<div class="text-center py-4 text-emerald-500 font-bold"><i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2"></i><p class="text-sm">Acquisito!</p></div>';
+                        lucide.createIcons();
+                    });
+                },
+                (errorMessage) => {
+                    // Ignora gli errori di scansione continui finché non inquadra
+                }
+            ).catch((err) => {
+                console.error(err);
+                document.getElementById('reader').innerHTML = '<div class="text-red-500 text-xs p-4 text-center">Impossibile avviare la fotocamera posteriore. Riprova.</div>';
             });
         };
 
-        // Aggiorniamo chiudiModale per killare lo scanner se attivo
         const oldChiudiModale = window.chiudiModale;
         window.chiudiModale = () => {
-            if(html5QrcodeScanner) {
-                try { html5QrcodeScanner.clear(); } catch(e){}
-                html5QrcodeScanner = null;
+            if(html5Qrcode) {
+                try { html5Qrcode.stop(); } catch(e){}
+                html5Qrcode = null;
             }
             oldChiudiModale();
         };
