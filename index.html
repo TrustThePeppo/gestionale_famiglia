@@ -1098,34 +1098,6 @@
             }
 
             return `
-                            <div class="bg-white rounded-xl p-3 border border-orange-200/80 flex flex-col md:flex-row md:items-center justify-between gap-2 shadow-sm">
-                                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
-                                    <span class="inline-block w-fit text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${badgeColor}">${item.origine}</span>
-                                    <span class="font-semibold text-slate-800 text-sm">${item.descrizione}</span>
-                                    ${item.importo ? `<span class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded w-fit">€ ${parseFloat(item.importo).toFixed(2)}</span>` : ''}
-                                </div>
-                                <div class="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
-                                    <span class="text-xs font-semibold ${isScaduta ? 'text-red-600' : 'text-orange-600'}">${statusText}</span>
-                                    <span class="font-bold text-sm px-2.5 py-1 rounded-lg ${isScaduta ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}">${window.formattaDataIT(item.data)}</span>
-                                </div>
-                            </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-                `;
-            } else {
-                alertBannerHtml = `
-                <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-8 flex items-center gap-3 text-emerald-800">
-                    <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-600 flex-shrink-0"></i>
-                    <div class="text-sm">
-                        <span class="font-bold">Tutto sotto controllo!</span> Nessuna scadenza imminente rilevata nei prossimi 40 giorni.
-                    </div>
-                </div>
-                `;
-            }
-
-            return `
                 ${alertBannerHtml}
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
                     <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
@@ -1149,10 +1121,7 @@
                 </div>
             `;
         }
-
-        // ==========================================
-        // VISTA: CASA
-        // ==========================================
+// ==========================================
         function creaHtmlCasa(categoriaCorrente) {
             const voci = window.appState.dati.scadenze_casa
                 .filter(v => v.sottoCategoria === categoriaCorrente)
