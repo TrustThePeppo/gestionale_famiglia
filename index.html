@@ -25,6 +25,9 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+        <!-- Librerie per Barcode (Stocard clone) -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <!-- Librerie per esportazioni (Word + PDF) -->
     <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -189,6 +192,15 @@
                     <li><button onclick="cambiaVista('prestiti', 'Mutui e Prestiti', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Mutui e Prestiti</button></li>
                 </ul>
             </div>
+            <!-- SEZIONE TESSERE -->
+            <div id="nav-tessere" class="px-3 mt-4">
+                <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <i data-lucide="credit-card" class="w-4 h-4 flex-shrink-0"></i> Carte e Tessere
+                </h3>
+                <ul class="space-y-1">
+                    <li><button onclick="cambiaVista('tessere', 'Le Mie Tessere', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Le Mie Tessere</button></li>
+                </ul>
+            </div>
             <!-- SEZIONE BLOCCO NOTE -->
             <div id="nav-note" class="px-3 mt-4">
                 <h3 class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -351,6 +363,7 @@
                 cibo_ricette: [],
                 cibo_menu_salvati: [],
                 detersivi: [],
+                tessere: [],
                 calendario: [],
                 utenti: [],
                 audit_logs: []
@@ -587,7 +600,8 @@
                                 veicoli: { view: true, edit: true },
                                 prestiti: { view: true, edit: true },
                                 cibo: { view: true, edit: true },
-                                note: { view: true, edit: true },
+                                tessere: { view: true, edit: true },
+                                    note: { view: true, edit: true },
                                 calendario: { view: true, edit: true }
                             },
                             ts: Date.now()
@@ -666,6 +680,7 @@
             refs.cibo_ricette = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_ricette');
             refs.cibo_menu_salvati = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_menu_salvati');
             refs.detersivi = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'detersivi');
+            refs.tessere = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'tessere');
             refs.calendario = collection(db, 'artifacts', APP_ID, 'users', currentUserId, 'calendario');
 
             onSnapshot(refs.cibo_spesa, (snap) => {
@@ -691,6 +706,11 @@
                 window.appState.dati.detersivi = [];
                 snap.forEach(d => window.appState.dati.detersivi.push({ id: d.id, ...d.data() }));
                 if(window.appState.vistaAttuale === 'cibo' && window.appState.sottoCategoria === 'Detersivi') renderizzaContenuto();
+            });
+            onSnapshot(refs.tessere, (snap) => {
+                window.appState.dati.tessere = [];
+                snap.forEach(d => window.appState.dati.tessere.push({ id: d.id, ...d.data() }));
+                if(window.appState.vistaAttuale === 'tessere') renderizzaContenuto();
             });
             onSnapshot(refs.calendario, (snap) => {
                 window.appState.dati.calendario = [];
@@ -736,6 +756,7 @@
             toggleSection('nav-veicoli', perm.veicoli?.view);
             toggleSection('nav-prestiti', perm.prestiti?.view);
             toggleSection('nav-cibo', perm.cibo?.view);
+            toggleSection('nav-tessere', perm.tessere?.view);
             toggleSection('nav-note', perm.note?.view);
             toggleSection('nav-calendario', perm.calendario?.view);
             
@@ -847,6 +868,10 @@
             }
             else if (window.appState.vistaAttuale === 'admin') {
                 container.innerHTML = creaHtmlAmministrazione();
+            }
+            else if (window.appState.vistaAttuale === 'tessere') {
+                actions.innerHTML = puoModificare("tessere") ? `<button onclick="apriModaleTessera()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Tessera</button>` : "";
+                container.innerHTML = creaHtmlTessere();
             }
             else if (window.appState.vistaAttuale === 'note') {
                 actions.innerHTML = `
@@ -1659,6 +1684,7 @@
                             veicoli: { view: true, edit: false },
                             prestiti: { view: true, edit: false },
                             cibo: { view: true, edit: false },
+                            tessere: { view: true, edit: false },
                             note: { view: true, edit: false },
                             calendario: { view: true, edit: true } 
                         },
@@ -1783,6 +1809,7 @@
                     ${renderToggle('veicoli', 'Veicoli')}
                     ${renderToggle('prestiti', 'Finanze / Mutui')}
                     ${renderToggle('cibo', 'Alimenti e Spesa')}
+                    ${renderToggle('tessere', 'Tessere Fedeltà')}
                     ${renderToggle('note', 'Blocco Note')}
                     ${renderToggle('calendario', 'Calendario')}
                     
@@ -1807,6 +1834,7 @@
                 veicoli: getPerm('veicoli'),
                 prestiti: getPerm('prestiti'),
                 cibo: getPerm('cibo'),
+                tessere: getPerm('tessere'),
                 note: getPerm('note'),
                 calendario: getPerm('calendario')
             };
@@ -3613,6 +3641,158 @@
             mostraNotifica("Ricetta salvata!", "success"); 
         };
 
+        
+        // ==========================================
+        // VISTA E LOGICA: TESSERE FEDELTÀ (STOCARD CLONE)
+        // ==========================================
+        window.creaHtmlTessere = () => {
+            const tessere = window.appState.dati.tessere || [];
+            
+            if (tessere.length === 0) {
+                return `<div class="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 mt-2"><i data-lucide="barcode" class="w-12 h-12 mx-auto mb-3 opacity-50"></i><p>Nessuna tessera salvata. Clicca su "Aggiungi Tessera" per inquadrare il codice a barre!</p></div>`;
+            }
+            
+            tessere.sort((a, b) => a.nome.localeCompare(b.nome));
+
+            return `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2">` + tessere.map(t => {
+                const colorBg = t.colore || '#3b82f6';
+                // Calcoliamo se il colore è chiaro o scuro per adattare il testo
+                const hex = colorBg.replace('#', '');
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                const textColor = (yiq >= 128) ? 'text-slate-800' : 'text-white';
+                
+                return `
+                <div class="rounded-xl shadow-sm border border-slate-200 flex flex-col relative group transition-all hover:shadow-md overflow-hidden bg-white cursor-pointer" onclick="mostraCodiceTessera('${t.id}')">
+                    <div class="h-20 md:h-24 w-full flex items-center justify-center relative" style="background-color: ${colorBg};">
+                        <h3 class="font-bold text-lg md:text-xl ${textColor} drop-shadow-md px-2 text-center break-words leading-tight max-h-full overflow-hidden">${window.escapeStr(t.nome)}</h3>
+                        ${puoModificare('tessere') ? `<div class="absolute top-2 right-2 flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="event.stopPropagation(); apriModaleTessera('${t.id}')" class="bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm p-1.5 rounded-md transition-colors"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                        </div>` : ''}
+                    </div>
+                    <div class="p-3 bg-white flex flex-col items-center border-t border-slate-100 relative">
+                        <i data-lucide="barcode" class="w-8 h-8 text-slate-800 mb-1"></i>
+                        <p class="text-xs font-mono text-slate-500 truncate w-full text-center">${window.escapeStr(t.codice)}</p>
+                    </div>
+                </div>
+                `;
+            }).join('') + `</div>`;
+        };
+
+        let html5QrcodeScanner = null;
+
+        window.apriModaleTessera = (id = null) => {
+            let t = { nome: '', codice: '', colore: '#3b82f6' };
+            if (id) t = window.appState.dati.tessere.find(x => x.id === id) || t;
+            
+            apriModaleHTML(`${id ? 'Modifica' : 'Nuova'} Tessera`, `
+                <form onsubmit="salvaTessera(event, '${id || ''}')" class="space-y-4"> 
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Nome Negozio / Tessera</label>
+                        <input type="text" id="tes-nome" value="${window.escapeStr(t.nome)}" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" placeholder="es. Conad, Ikea, Esselunga">
+                    </div> 
+                    
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Codice a Barre (o Scansiona)</label>
+                            <input type="text" id="tes-codice" value="${window.escapeStr(t.codice)}" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Colore Tessera</label>
+                            <input type="color" id="tes-colore" value="${t.colore}" class="w-full h-10 border border-slate-300 rounded-lg cursor-pointer">
+                        </div>
+                    </div>
+
+                    ${!id ? `<div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-center" id="scanner-container">
+                        <p class="text-xs text-indigo-700 mb-2">Sei da mobile? Inquadra il codice a barre della tua carta fisica.</p>
+                        <button type="button" onclick="avviaScanner()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm">
+                            <i data-lucide="scan-barcode" class="w-4 h-4"></i> Scansiona Fotocamera
+                        </button>
+                        <div id="reader" class="mt-3 w-full overflow-hidden rounded-lg"></div>
+                    </div>` : ''}
+                    
+                    <div class="flex gap-2 pt-2">
+                        ${id ? `<button type="button" onclick="eliminaDoc('tessere', '${id}'); chiudiModale();" class="w-full md:w-auto bg-white border border-red-200 text-red-600 py-2.5 px-4 rounded-lg font-bold hover:bg-red-50 shadow-sm transition-colors text-sm flex items-center justify-center gap-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i> Elimina</button>` : ''}
+                        <button type="submit" class="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-lg font-bold hover:bg-indigo-700 shadow-sm transition-colors text-sm flex items-center justify-center gap-1.5"><i data-lucide="save" class="w-4 h-4"></i> Salva Tessera</button> 
+                    </div>
+                </form>
+            `);
+        };
+
+        window.avviaScanner = () => {
+            document.getElementById('reader').innerHTML = '';
+            if(html5QrcodeScanner) {
+                try { html5QrcodeScanner.clear(); } catch(e){}
+            }
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 100}, aspectRatio: 1.5 }, false);
+            html5QrcodeScanner.render((decodedText, decodedResult) => {
+                document.getElementById('tes-codice').value = decodedText;
+                mostraNotifica("Codice letto con successo!", "success");
+                html5QrcodeScanner.clear();
+            }, (error) => {
+                // Ignore silent errors during scanning
+            });
+        };
+
+        // Aggiorniamo chiudiModale per killare lo scanner se attivo
+        const oldChiudiModale = window.chiudiModale;
+        window.chiudiModale = () => {
+            if(html5QrcodeScanner) {
+                try { html5QrcodeScanner.clear(); } catch(e){}
+                html5QrcodeScanner = null;
+            }
+            oldChiudiModale();
+        };
+
+        window.salvaTessera = async (e, idStr) => {
+            e.preventDefault();
+            const data = {
+                nome: document.getElementById('tes-nome').value,
+                codice: document.getElementById('tes-codice').value,
+                colore: document.getElementById('tes-colore').value,
+                ts: Date.now()
+            };
+            if (idStr) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'tessere', idStr), data);
+            } else {
+                await addDoc(refs.tessere, data);
+            }
+            chiudiModale();
+            mostraNotifica("Tessera salvata!", "success");
+        };
+
+        window.mostraCodiceTessera = (id) => {
+            const t = window.appState.dati.tessere.find(x => x.id === id);
+            if(!t) return;
+            apriModaleHTML(t.nome, `
+                <div class="flex flex-col items-center py-6">
+                    <p class="text-sm text-slate-500 mb-6 text-center max-w-sm">Mostra questo codice a barre alla cassa.<br>Alza la luminosità dello schermo per facilitare la lettura.</p>
+                    
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <svg id="barcode-canvas"></svg>
+                    </div>
+                    
+                    <p class="mt-6 font-mono text-xl font-bold tracking-widest text-slate-800">${window.escapeStr(t.codice)}</p>
+                </div>
+            `);
+            
+            setTimeout(() => {
+                try {
+                    JsBarcode("#barcode-canvas", t.codice, {
+                        format: "CODE128", 
+                        width: 2.5,
+                        height: 100,
+                        displayValue: false
+                    });
+                } catch(e) {
+                    console.error("Barcode fallback", e);
+                    document.getElementById('barcode-canvas').outerHTML = '<div class="text-red-500 text-sm p-4 text-center border border-red-200 bg-red-50 rounded">Formato codice a barre non supportato dalla grafica, ma puoi dettare il numero in cassa o inserirlo manualmente.<br><br><b>' + t.codice + '</b></div>';
+                }
+            }, 100);
+        };
+
         // ==========================================
         // VISTA E LOGICA: BLOCCO NOTE
         // ==========================================
@@ -3725,6 +3905,7 @@
                         if (collezione === 'casa') refStr = 'scadenze_casa';
                         if (collezione === 'veicoli') refStr = 'veicoli';
                         if (collezione === 'prestiti') refStr = 'prestiti';
+                        if (collezione === 'tessere') refStr = 'tessere';
                         if (collezione === 'note') refStr = 'note';
                         if (collezione === 'cibo_spesa') refStr = 'cibo_spesa';
                         if (collezione === 'cibo_menu') refStr = 'cibo_menu';
