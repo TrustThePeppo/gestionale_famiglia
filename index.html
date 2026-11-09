@@ -3793,16 +3793,37 @@
             `);
             
             setTimeout(() => {
-                try {
+                // Riconoscimento intelligente del formato del codice a barre
+                let barcodeFormat = "CODE128";
+                const soloNumeri = /^\d+$/.test(t.codice);
+                
+                if (soloNumeri && t.codice.length === 13) {
+                    barcodeFormat = "EAN13";
+                } else if (soloNumeri && t.codice.length === 8) {
+                    barcodeFormat = "EAN8";
+                } else if (soloNumeri && t.codice.length === 12) {
+                    barcodeFormat = "UPC";
+                }
+
+                const disegnaBarcode = (formatoScelto) => {
                     JsBarcode("#barcode-canvas", t.codice, {
-                        format: "CODE128", 
+                        format: formatoScelto, 
                         width: 2.5,
                         height: 100,
                         displayValue: false
                     });
+                };
+
+                try {
+                    disegnaBarcode(barcodeFormat);
                 } catch(e) {
-                    console.error("Barcode fallback", e);
-                    document.getElementById('barcode-canvas').outerHTML = '<div class="text-red-500 text-sm p-4 text-center border border-red-200 bg-red-50 rounded">Formato codice a barre non supportato dalla grafica, ma puoi dettare il numero in cassa o inserirlo manualmente.<br><br><b>' + t.codice + '</b></div>';
+                    // Fallback di sicurezza: se EAN13 fallisce per via del checksum errato inserito dall'utente, forza CODE128
+                    try {
+                        disegnaBarcode("CODE128");
+                    } catch (err) {
+                        console.error("Barcode fallback", err);
+                        document.getElementById('barcode-canvas').outerHTML = '<div class="text-red-500 text-sm p-4 text-center border border-red-200 bg-red-50 rounded">Formato codice a barre non supportato dalla grafica, ma puoi dettare il numero in cassa o inserirlo manualmente.<br><br><b>' + t.codice + '</b></div>';
+                    }
                 }
             }, 100);
         };
