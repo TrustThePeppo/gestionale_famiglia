@@ -8,7 +8,8 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# File temporanei
+# File temporanei e di backup
 *.log
 *.tmp
 *.bak
+*.swp
