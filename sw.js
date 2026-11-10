@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestionale-family-v1';
+const CACHE_NAME = 'gestionale-family-v2';
 const ASSETS = [
     '/',
     '/index.html',
