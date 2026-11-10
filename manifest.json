@@ -1,20 +1,26 @@
 {
-  "name": "Gestionale Famiglia",
+  "name": "Gestionale Famiglia Completo",
   "short_name": "Mommini",
+  "description": "Gestionale familiare cloud per casa, veicoli, finanze, spesa, tessere e agenda condivisa.",
+  "lang": "it-IT",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
   "theme_color": "#1e293b",
   "icons": [
     {
-      "src": "icona-app.jpg",
+      "src": "./icona-app.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     },
     {
-      "src": "icona-app.jpg",
+      "src": "./icona-app.jpg",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     }
   ]
 }
