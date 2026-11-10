@@ -21,10 +21,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
+    // Ignoriamo le chiamate alle API di Firebase per lasciar gestire la sincronizzazione e cache locale a Firestore
     if (event.request.url.includes('firestore.googleapis.com')) return;
     if (event.request.url.includes('identitytoolkit.googleapis.com')) return;
 
-    // Strategia Network-First: prova a scaricare la versione più aggiornata, se fallisce (offline) usa la cache
+    // Strategia Network-First per l'interfaccia: prova a scaricare la versione più aggiornata, se fallisce (offline) usa la cache
     event.respondWith(
         fetch(event.request).then((response) => {
             return caches.open(CACHE_NAME).then((cache) => {
