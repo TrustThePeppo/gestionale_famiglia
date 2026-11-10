@@ -123,7 +123,6 @@
                 <h1 class="text-white font-bold text-lg tracking-wide">Gestionale Famiglia</h1>
                 <p class="text-xs text-slate-400 mt-1" id="status-cloud">Connessione in corso...</p>
                 <p class="text-[10px] font-bold mt-0.5" id="status-network"></p>
-                <p class="text-[10px] font-bold mt-0.5" id="status-network"></p>
             </div>
             <button onclick="toggleMenu()" class="md:hidden text-slate-400 hover:text-white bg-slate-800 p-2 rounded-lg">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -333,7 +332,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "10.11.2026_12.48";
+        const CURRENT_APP_VERSION = "10.11.2026_19.50";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -678,6 +677,7 @@
                 window.appState.dati.allegati = [];
                 snap.forEach(d => window.appState.dati.allegati.push({ id: d.id, ...d.data() }));
                 renderizzaContenuto();
+                if (document.getElementById('lista-allegati-target')) window.caricaListaAllegati();
             }, (err) => console.error("Errore lettura allegati:", err));
 
             refs.utenti = collection(db, 'artifacts', APP_ID, 'utenti');
@@ -864,8 +864,7 @@
                     actions.innerHTML = `
                         <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                             <button onclick="esportaMenu()" class="w-full md:w-auto bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="download" class="w-4 h-4"></i> Esporta</button>
-                            ` + (puoModificare("cibo") ? `<button onclick="apriModaleSalvaMenu()" class="w-full md:w-auto bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="download" class="w-4 h-4"></i> Esporta</button>
-                            <button onclick="apriModaleSalvaMenu()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="save" class="w-4 h-4"></i> Salva</button>
+                            ` + (puoModificare("cibo") ? `<button onclick="apriModaleSalvaMenu()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="save" class="w-4 h-4"></i> Salva</button>
                             <button onclick="apriModaleCaricaMenu()" class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-colors"><i data-lucide="folder-open" class="w-4 h-4"></i> Modelli</button>` : "") + `
                         </div>
                     `;
@@ -1569,70 +1568,19 @@
             } else if (sub === 'Avvisi via Email') {
                 icon = 'mail';
                 const p = window.appState.utenteCorrenteDati?.impostazioni_notifiche || {
-                    casa_spese: true, 
-                    casa_manutenzione: true, 
-                    veicoli_legali: true, 
-                    veicoli_manutenzione: true,
-                    cal_mommino: true,
-                    cal_mommina: true,
-                    cal_famiglia: true,
                     preavviso: '1'
                 };
                 content = `
                 <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 text-sm text-blue-900">
-                    <strong>Configurazione Riepilogo Mattutino:</strong> Scegli per quali categorie desideri ricevere un'email automatica (inviata alle 08:00) all'indirizzo associato al tuo account.
+                    <strong>Sincronizzazione Automatica Quadro Generale:</strong> Il riepilogo mattutino (inviato tra le 08:00 e le 09:00) controlla automaticamente le voci attive del Quadro Generale:
+                    <ul class="list-disc pl-5 mt-2 space-y-1 text-xs text-blue-800">
+                        <li><strong>Veicoli:</strong> Scadenze Bollo, Assicurazione, Revisione, Prossimo Tagliando stimato (+1 anno) e Prossima Inversione/Sostituzione Pneumatici.</li>
+                        <li><strong>Casa:</strong> Scadenze non completate nelle sezioni <em>Caldaia</em> e <em>Varie</em>.</li>
+                        <li><strong>Agenda Condivisa:</strong> Eventi con la spunta <em>"Ricordami questo evento nel Quadro Generale"</em> attiva.</li>
+                    </ul>
                 </div>
 
                 <form onsubmit="salvaPreferenzeNotifiche(event)" class="space-y-6">
-                    <!-- BLOCCO VEICOLI -->
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="car" class="w-5 h-5 text-indigo-500"></i> Area Veicoli</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700">Scadenze Legali (Bollo, Assicurazione, Revisione)</span>
-                                <input type="checkbox" id="notif-veicoli-legali" ${p.veicoli_legali !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700">Manutenzione (Tagliandi, Gomme, Riparazioni)</span>
-                                <input type="checkbox" id="notif-veicoli-manut" ${p.veicoli_manutenzione !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- BLOCCO CASA -->
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="home" class="w-5 h-5 text-orange-500"></i> Area Casa</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700">Spese (Rate Condominio, Tasse, Bollette)</span>
-                                <input type="checkbox" id="notif-casa-spese" ${p.casa_spese !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700">Manutenzione (Caldaia, Lavori, Verbali)</span>
-                                <input type="checkbox" id="notif-casa-manut" ${p.casa_manutenzione !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- BLOCCO CALENDARIO -->
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="calendar" class="w-5 h-5 text-emerald-500"></i> Agenda Condivisa</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Mommino</span>
-                                <input type="checkbox" id="notif-cal-mommino" ${p.cal_mommino !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> Mommina</span>
-                                <input type="checkbox" id="notif-cal-mommina" ${p.cal_mommina !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Famiglia & Casa</span>
-                                <input type="checkbox" id="notif-cal-famiglia" ${p.cal_famiglia !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </label>
-                        </div>
-                    </div>
-                    
                     <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col md:flex-row justify-between md:items-center gap-4">
                         <div class="flex items-center gap-3">
                             <span class="text-sm font-bold text-slate-700">Preavviso Avvisi via Email:</span>
@@ -2584,6 +2532,10 @@
                 const veicolo = window.appState.dati.veicoli.find(v => v.id === veicoloId); 
                 const nuoveManutenzioni = veicolo.manutenzioni.filter(m => m.idMan !== idMan); 
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', veicoloId), { manutenzioni: nuoveManutenzioni }); 
+                const allegatiOrfani = (window.appState.dati.allegati || []).filter(a => a.refId === idMan);
+                for (const al of allegatiOrfani) {
+                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'allegati', al.id));
+                }
                 mostraNotifica("Voce eliminata", "success"); 
             });
         };
@@ -2783,12 +2735,7 @@
             const container = document.getElementById('lista-allegati-target');
             if (!container) return;
             try {
-                const snap = await getDocs(refs.allegati);
-                const allegati = [];
-                snap.forEach(d => {
-                    const data = d.data();
-                    if (data.refId === idTarget) allegati.push({ id: d.id, ...data });
-                });
+                const allegati = (window.appState.dati.allegati || []).filter(a => a.refId === idTarget);
                 
                 if (allegati.length === 0) {
                     container.innerHTML = '<div class="text-center text-slate-400 py-6 text-sm bg-slate-50 rounded-lg border border-slate-100">Nessun documento caricato per questa voce.</div>';
@@ -4070,7 +4017,18 @@
                         if (collezione === 'cibo_menu_salvati') refStr = 'cibo_menu_salvati';
                         if (collezione === 'detersivi') refStr = 'detersivi';
                         if (collezione === 'calendario') refStr = 'calendario';
+                        const idsAllegatiDaRimuovere = [id];
+                        if (collezione === 'veicoli') {
+                            const veic = (window.appState.dati.veicoli || []).find(v => v.id === id);
+                            if (veic && Array.isArray(veic.manutenzioni)) {
+                                veic.manutenzioni.forEach(m => { if (m.idMan) idsAllegatiDaRimuovere.push(m.idMan); });
+                            }
+                        }
                         await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, refStr, id));
+                        const allegatiOrfani = (window.appState.dati.allegati || []).filter(a => idsAllegatiDaRimuovere.includes(a.refId));
+                        for (const al of allegatiOrfani) {
+                            await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'allegati', al.id));
+                        }
                     }
                     mostraNotifica("Elemento eliminato", "success");
                     window.registraAudit('Eliminazione', `Eliminato record da collezione: ${collezione}`);
@@ -4140,34 +4098,6 @@
         
         window.addEventListener('offline', () => {
             window.aggiornaStatoRete();
-            mostraNotifica("Sei Offline. Modifiche salvate sul dispositivo.", "error");
-        });
-
-        // Inizializza subito lo stato
-        window.aggiornaStatoRete();
-
-
-        // ==========================================
-        // GESTIONE STATO RETE ONLINE / OFFLINE
-        // ==========================================
-        window.aggiornaStatoRete = () => {
-            const el = document.getElementById('status-network');
-            if (!el) return;
-            if (navigator.onLine) {
-                el.innerHTML = '<span class="text-blue-400 flex items-center gap-1"><i data-lucide="wifi" class="w-3 h-3"></i> Modalità Online</span>';
-            } else {
-                el.innerHTML = '<span class="text-amber-500 flex items-center gap-1"><i data-lucide="wifi-off" class="w-3 h-3"></i> Modalità Offline (Cache)</span>';
-            }
-            if (window.lucide) window.lucide.createIcons();
-        };
-
-        window.addEventListener('online', () => {
-            window.aggiornaStatoRete();
-            mostraNotifica("Connessione ripristinata. Sincronizzazione in corso...", "success");
-        });
-        
-        window.addEventListener('offline', () => {
-            window.aggiornaStatoRete();
             mostraNotifica("Sei Offline. Le modifiche verranno salvate sul dispositivo.", "error");
         });
 
@@ -4178,13 +4108,13 @@
         window.salvaPreferenzeNotifiche = async (e) => {
             e.preventDefault();
             const pref = {
-                casa_spese: document.getElementById('notif-casa-spese').checked,
-                casa_manutenzione: document.getElementById('notif-casa-manut').checked,
-                veicoli_legali: document.getElementById('notif-veicoli-legali').checked,
-                veicoli_manutenzione: document.getElementById('notif-veicoli-manut').checked,
-                cal_mommino: document.getElementById('notif-cal-mommino').checked,
-                cal_mommina: document.getElementById('notif-cal-mommina').checked,
-                cal_famiglia: document.getElementById('notif-cal-famiglia').checked,
+                casa_spese: document.getElementById('notif-casa-spese') ? document.getElementById('notif-casa-spese').checked : true,
+                casa_manutenzione: document.getElementById('notif-casa-manut') ? document.getElementById('notif-casa-manut').checked : true,
+                veicoli_legali: document.getElementById('notif-veicoli-legali') ? document.getElementById('notif-veicoli-legali').checked : true,
+                veicoli_manutenzione: document.getElementById('notif-veicoli-manut') ? document.getElementById('notif-veicoli-manut').checked : true,
+                cal_mommino: document.getElementById('notif-cal-mommino') ? document.getElementById('notif-cal-mommino').checked : true,
+                cal_mommina: document.getElementById('notif-cal-mommina') ? document.getElementById('notif-cal-mommina').checked : true,
+                cal_famiglia: document.getElementById('notif-cal-famiglia') ? document.getElementById('notif-cal-famiglia').checked : true,
                 preavviso: document.getElementById('notif-preavviso').value
             };
             
