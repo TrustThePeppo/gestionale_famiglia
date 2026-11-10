@@ -273,6 +273,9 @@
                     <i data-lucide="log-out" class="w-5 h-5 flex-shrink-0"></i>
                     <span class="font-medium">Esci / Blocca</span>
                 </button>
+                <div class="pt-4 mt-2 text-center">
+                    <p class="text-[10px] text-slate-500 font-mono tracking-wide">Ultima versione:<br><span id="app-version-display" class="font-bold text-slate-400"></span></p>
+                </div>
             </div>
         </nav>
     </aside>
@@ -330,14 +333,16 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "10.11.2026_11.52";
+        const CURRENT_APP_VERSION = "10.11.2026_12.24";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
-                if(window.mostraNotifica) window.mostraNotifica("✨ App aggiornata all'ultima versione di GitHub!", "success");
+                if(window.mostraNotifica) window.mostraNotifica("✨ App aggiornata all'ultima versione di GitHub!", "success", 6000);
             }, 2000);
         }
         localStorage.setItem('gestionale_version', CURRENT_APP_VERSION);
+        const vDisplay = document.getElementById('app-version-display');
+        if (vDisplay) vDisplay.innerText = CURRENT_APP_VERSION.replace('_', ' - ');
 
         // Inizializza Icone Iniziali
         lucide.createIcons();
@@ -460,7 +465,7 @@
         };
 
         // --- SISTEMA DI NOTIFICHE ---
-        window.mostraNotifica = function(messaggio, tipo = 'info') {
+        window.mostraNotifica = function(messaggio, tipo = 'info', durata = 3000) {
             const toast = document.getElementById('toast');
             const icon = document.getElementById('toast-icon');
             document.getElementById('toast-msg').innerText = messaggio;
@@ -482,7 +487,7 @@
             setTimeout(() => { 
                 toast.classList.add('hidden'); 
                 toast.classList.remove('toast-enter');
-            }, 3000);
+            }, durata);
         };
 
         // --- SISTEMA DI LOGIN NATIVO FIREBASE ---
@@ -1566,11 +1571,18 @@
             } else if (sub === 'Notifiche Push') {
                 icon = 'bell-ring';
                 const p = window.appState.utenteCorrenteDati?.impostazioni_notifiche || {
-                    casa: true, veicoli: true, calendario: true, preavviso: '1'
+                    casa_spese: true, 
+                    casa_manutenzione: true, 
+                    veicoli_legali: true, 
+                    veicoli_manutenzione: true,
+                    cal_mommino: true,
+                    cal_mommina: true,
+                    cal_famiglia: true,
+                    preavviso: '1'
                 };
                 content = `
                 <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 text-sm text-blue-900">
-                    <strong>Configurazione Notifiche:</strong> Imposta per quali scadenze desideri ricevere una notifica push (come quelle di WhatsApp) sul display del tuo smartphone.
+                    <strong>Configurazione Avanzata Notifiche:</strong> Scegli esattamente per quali categorie e sottocategorie desideri ricevere avvisi sul telefono.
                 </div>
                 <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 mb-6">
                     <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="smartphone" class="w-5 h-5 text-blue-600"></i> Autorizzazione Dispositivo</h4>
@@ -1583,38 +1595,71 @@
                     </div>
                 </div>
 
-                <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-                    <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="sliders" class="w-5 h-5 text-emerald-600"></i> Regole di Avviso</h4>
-                    <form onsubmit="salvaPreferenzeNotifiche(event)" class="space-y-4">
+                <form onsubmit="salvaPreferenzeNotifiche(event)" class="space-y-6">
+                    
+                    <!-- BLOCCO VEICOLI -->
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="car" class="w-5 h-5 text-indigo-500"></i> Area Veicoli</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer" onclick="document.getElementById('notif-veicoli').click()">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="car" class="w-4 h-4 text-indigo-500"></i> Veicoli (Bollo, Assic., Tagliando)</span>
-                                <input type="checkbox" id="notif-veicoli" ${p.veicoli ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </div>
-                            <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer" onclick="document.getElementById('notif-casa').click()">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="home" class="w-4 h-4 text-orange-500"></i> Casa (Rate, Condominio)</span>
-                                <input type="checkbox" id="notif-casa" ${p.casa ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </div>
-                            <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer" onclick="document.getElementById('notif-calendario').click()">
-                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4 text-emerald-500"></i> Eventi Calendario</span>
-                                <input type="checkbox" id="notif-calendario" ${p.calendario ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
-                            </div>
-                            <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center">
-                                <span class="text-sm font-semibold text-slate-700 flex-1">Invia Notifica Push:</span>
-                                <select id="notif-preavviso" class="border border-slate-300 rounded p-1.5 text-sm bg-white outline-none font-bold text-blue-700 cursor-pointer">
-                                    <option value="1" ${p.preavviso === '1' ? 'selected' : ''}>1 Giorno prima</option>
-                                    <option value="3" ${p.preavviso === '3' ? 'selected' : ''}>3 Giorni prima</option>
-                                    <option value="7" ${p.preavviso === '7' ? 'selected' : ''}>7 Giorni prima</option>
-                                </select>
-                            </div>
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700">Scadenze Legali (Bollo, Assicurazione, Revisione)</span>
+                                <input type="checkbox" id="notif-veicoli-legali" ${p.veicoli_legali !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700">Manutenzione (Tagliandi, Gomme, Riparazioni)</span>
+                                <input type="checkbox" id="notif-veicoli-manut" ${p.veicoli_manutenzione !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
                         </div>
-                        <div class="pt-4 border-t border-slate-100 flex justify-end">
-                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 transition-colors"><i data-lucide="save" class="w-4 h-4"></i> Salva Preferenze</button>
-                        </div>
-                    </form>
-                </div>
-                `;
+                    </div>
 
+                    <!-- BLOCCO CASA -->
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="home" class="w-5 h-5 text-orange-500"></i> Area Casa</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700">Spese (Rate Condominio, Tasse, Bollette)</span>
+                                <input type="checkbox" id="notif-casa-spese" ${p.casa_spese !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700">Manutenzione (Caldaia, Lavori, Verbali)</span>
+                                <input type="checkbox" id="notif-casa-manut" ${p.casa_manutenzione !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- BLOCCO CALENDARIO -->
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><i data-lucide="calendar" class="w-5 h-5 text-emerald-500"></i> Agenda Condivisa</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Mommino</span>
+                                <input type="checkbox" id="notif-cal-mommino" ${p.cal_mommino !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> Mommina</span>
+                                <input type="checkbox" id="notif-cal-mommina" ${p.cal_mommina !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                            <label class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Famiglia & Casa</span>
+                                <input type="checkbox" id="notif-cal-famiglia" ${p.cal_famiglia !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-bold text-slate-700">Preavviso Notifiche Push:</span>
+                            <select id="notif-preavviso" class="border border-slate-300 rounded p-2 text-sm bg-white outline-none font-bold text-blue-700 cursor-pointer shadow-sm">
+                                <option value="1" ${p.preavviso === '1' ? 'selected' : ''}>1 Giorno prima</option>
+                                <option value="3" ${p.preavviso === '3' ? 'selected' : ''}>3 Giorni prima</option>
+                                <option value="7" ${p.preavviso === '7' ? 'selected' : ''}>7 Giorni prima</option>
+                                <option value="0" ${p.preavviso === '0' ? 'selected' : ''}>Il Giorno stesso (Mattina)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-lg text-sm font-bold shadow-md flex items-center justify-center gap-2 transition-colors"><i data-lucide="save" class="w-5 h-5"></i> Salva Configurazione</button>
+                    </div>
+                </form>
+                `;
             } else if (sub === 'Sessioni') {
                 icon = 'activity';
                 const utentiDb = window.appState.dati.utenti || [];
@@ -4188,9 +4233,13 @@
         window.salvaPreferenzeNotifiche = async (e) => {
             e.preventDefault();
             const pref = {
-                casa: document.getElementById('notif-casa').checked,
-                veicoli: document.getElementById('notif-veicoli').checked,
-                calendario: document.getElementById('notif-calendario').checked,
+                casa_spese: document.getElementById('notif-casa-spese').checked,
+                casa_manutenzione: document.getElementById('notif-casa-manut').checked,
+                veicoli_legali: document.getElementById('notif-veicoli-legali').checked,
+                veicoli_manutenzione: document.getElementById('notif-veicoli-manut').checked,
+                cal_mommino: document.getElementById('notif-cal-mommino').checked,
+                cal_mommina: document.getElementById('notif-cal-mommina').checked,
+                cal_famiglia: document.getElementById('notif-cal-famiglia').checked,
                 preavviso: document.getElementById('notif-preavviso').value
             };
             
@@ -4205,8 +4254,8 @@
                 
                 await updateDoc(userRef, { impostazioni_notifiche: pref, ts: Date.now() });
                 window.appState.utenteCorrenteDati.impostazioni_notifiche = pref;
-                mostraNotifica("Regole di avviso salvate correttamente!", "success");
-                window.registraAudit('Modifica', 'Aggiornate regole notifiche push');
+                mostraNotifica("Configurazione salvata con successo!", "success");
+                window.registraAudit('Modifica', 'Aggiornate regole avanzate notifiche push');
                 
                 setTimeout(() => { btn.innerHTML = origHtml; if(window.lucide) window.lucide.createIcons(); }, 500);
             } catch (err) {
