@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestionale-family-10.11.2026_10.53';
+const CACHE_NAME = 'gestionale-family-10.11.2026_11.52';
 const ASSETS = [
     '/',
     '/index.html',
