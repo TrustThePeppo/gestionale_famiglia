@@ -328,6 +328,16 @@
         import { initializeAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence, updatePassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        
+        const CURRENT_APP_VERSION = "10.11.2026_10.53";
+        const savedVersion = localStorage.getItem('gestionale_version');
+        if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
+            setTimeout(() => {
+                if(window.mostraNotifica) window.mostraNotifica("✨ App aggiornata all'ultima versione di GitHub!", "success");
+            }, 2000);
+        }
+        localStorage.setItem('gestionale_version', CURRENT_APP_VERSION);
+
         // Inizializza Icone Iniziali
         lucide.createIcons();
 
