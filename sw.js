@@ -1,0 +1,38 @@
+const CACHE_NAME = 'gestionale-family-v1';
+const ASSETS = [
+    '/',
+    '/index.html',
+    '/manifest.json',
+    '/icona-app.jpg'
+];
+
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(ASSETS);
+        })
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
+    if (event.request.url.includes('firestore.googleapis.com')) return;
+    if (event.request.url.includes('identitytoolkit.googleapis.com')) return;
+
+    // Strategia Network-First: prova a scaricare la versione più aggiornata, se fallisce (offline) usa la cache
+    event.respondWith(
+        fetch(event.request).then((response) => {
+            return caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, response.clone());
+                return response;
+            });
+        }).catch(() => {
+            return caches.match(event.request);
+        })
+    );
+});

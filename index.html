@@ -322,7 +322,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { initializeAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence, updatePassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Inizializza Icone Iniziali
         lucide.createIcons();
@@ -340,7 +340,9 @@
         const app = initializeApp(firebaseConfig);
         // Forza la persistenza in memoria per evitare i blocchi di IndexedDB sui browser mobili in locale (file://)
         const auth = initializeAuth(app, { persistence: browserLocalPersistence });
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+        });
         
         // Identificativo App Fisso
         const APP_ID = 'gestionale_famiglia_pro';
@@ -4006,7 +4008,16 @@
             }
         };
 
+
+        // Registrazione Service Worker per il supporto Offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW fallito:', err));
+            });
+        }
+
         avviaApp();
+
 
     </script>
 </body>
