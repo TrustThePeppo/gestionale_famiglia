@@ -318,7 +318,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "11.11.2026_12.15";
+        const CURRENT_APP_VERSION = "11.11.2026_12.23";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -2512,6 +2512,7 @@
         const modalInner = document.getElementById('modal-content');
 
         window.chiudiModale = () => { modalCont.classList.replace('flex', 'hidden'); };
+        window.apriModaleHTML = apriModaleHTML;
         function apriModaleHTML(titolo, htmlBody) {
             modalInner.innerHTML = `<h2 class="text-xl font-bold mb-4 text-slate-800 pr-8">${titolo}</h2>${htmlBody}`;
             modalCont.classList.replace('hidden', 'flex');
