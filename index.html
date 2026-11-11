@@ -334,11 +334,11 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "10.11.2026_21.00";
+        const CURRENT_APP_VERSION = "10.11.2026_21.05";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
-                if(mostraNotifica) mostraNotifica("✨ App aggiornata all'ultima versione di GitHub!", "success", 6000);
+                if(window.mostraNotifica) window.mostraNotifica("✨ App aggiornata all'ultima versione di GitHub!", "success", 6000);
             }, 2000);
         }
         localStorage.setItem('gestionale_version', CURRENT_APP_VERSION);
@@ -467,7 +467,7 @@
         };
 
         // --- SISTEMA DI NOTIFICHE ---
-        mostraNotifica = function(messaggio, tipo = 'info', durata = 3000) {
+        window.mostraNotifica = function(messaggio, tipo = 'info', durata = 3000) {
             const toast = document.getElementById('toast');
             const icon = document.getElementById('toast-icon');
             document.getElementById('toast-msg').innerText = messaggio;
@@ -3418,7 +3418,7 @@
                                     <td class="py-3 px-4 text-slate-800 font-bold text-right text-base">€ ${parseFloat(s.importo).toFixed(2)}</td>
                                     <td class="py-3 px-4 flex justify-end gap-1 items-center">
                                         ${window.puoModificare('cibo') ? `
-                                        <button onclick="apriModaleScontrino('${s.id}')" class="text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                        <button onclick="window.apriModaleScontrino('${s.id}')" class="text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica"><i data-lucide="edit" class="w-4 h-4"></i></button>
                                         <button onclick="window.eliminaDoc('spese_supermercato', '${s.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md border border-transparent" title="Elimina"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         ` : ''}
                                     </td>
@@ -3455,13 +3455,13 @@
             if (id) s = window.appState.dati.spese_supermercato.find(x => x.id === id) || s;
             
             window.apriModaleHTML(`${id ? 'Modifica' : 'Nuovo'} Scontrino`, `
-                <form onsubmit="salvaScontrino(event, '${id || ''}')" class="space-y-4">
+                <form onsubmit="window.salvaScontrino(event, '${id || ''}')" class="space-y-4">
                     ${!id ? `
                     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
                         <label class="block text-sm font-semibold text-blue-900 mb-2">Scansione Rapida Fotocamera</label>
                         <p class="text-xs text-blue-700 mb-3">Scatta una foto alla parte bassa dello scontrino per estrarre in automatico l'importo totale.</p>
                         <div class="relative">
-                            <input type="file" accept="image/*" capture="environment" onchange="elaboraScansioneScontrino(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <input type="file" accept="image/*" capture="environment" onchange="window.elaboraScansioneScontrino(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
                             <button type="button" id="btn-scan-scontrino" class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700 transition shadow-sm flex items-center justify-center gap-2">
                                 <i data-lucide="camera" class="w-4 h-4"></i> Scatta Foto allo Scontrino
                             </button>
@@ -3501,7 +3501,7 @@
             if(!file) return;
 
             if (typeof Tesseract === 'undefined') {
-                mostraNotifica("La libreria di lettura OCR non è ancora stata caricata o sei offline senza cache.", "error");
+                window.mostraNotifica("La libreria di lettura OCR non è ancora stata caricata o sei offline senza cache.", "error");
                 return;
             }
 
@@ -3512,36 +3512,31 @@
             if(window.lucide) window.lucide.createIcons();
 
             try {
-                // Tesseract scarica automaticamente i dizionari necessari (ita.traineddata) dal web la prima volta
                 const worker = await Tesseract.createWorker('ita');
                 const ret = await worker.recognize(file);
                 const testo = ret.data.text.toUpperCase();
                 await worker.terminate();
 
-                // Regex robusta per trovare importi in formato europeo (es. 12,50 o 12.50)
-                // Cerca numeri che abbiano 2 cifre decimali
                 const regex = /\b\d{1,4}[.,]\d{2}\b/g;
                 const matches = testo.match(regex);
                 
                 if (matches) {
                     const numbers = matches.map(m => parseFloat(m.replace(',', '.')));
-                    // Lo scontrino spesso ha il totale come numero più alto o tra i più alti
-                    // Ignoriamo cifre sballate assurde (es > 5000 euro per la spesa)
                     const validNumbers = numbers.filter(n => n > 0 && n < 5000);
                     
                     if (validNumbers.length > 0) {
                         const maxNum = Math.max(...validNumbers);
                         document.getElementById('sco-importo').value = maxNum.toFixed(2);
-                        mostraNotifica("Importo estratto! Controlla se è corretto.", "success");
+                        window.mostraNotifica("Importo estratto! Controlla se è corretto.", "success");
                     } else {
-                        mostraNotifica("Non ho trovato importi validi. Inseriscilo a mano.", "error");
+                        window.mostraNotifica("Non ho trovato importi validi. Inseriscilo a mano.", "error");
                     }
                 } else {
-                    mostraNotifica("Nessun importo rilevato nella foto.", "error");
+                    window.mostraNotifica("Nessun importo rilevato nella foto.", "error");
                 }
             } catch(e) {
                 console.error(e);
-                mostraNotifica("Errore durante la lettura dell'immagine OCR.", "error");
+                window.mostraNotifica("Errore durante la lettura dell'immagine OCR.", "error");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -3559,12 +3554,14 @@
                 ts: Date.now()
             };
             if (idStr) {
+                // Here we specifically use updateDoc/doc that we imported at the top of the file!
+                // The previous code broke because it tried to do window.updateDoc
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'spese_supermercato', idStr), data);
             } else {
                 await addDoc(refs.spese_supermercato, data);
             }
-            chiudiModale();
-            mostraNotifica("Scontrino registrato!", "success");
+            window.chiudiModale();
+            window.mostraNotifica("Scontrino registrato!", "success");
         };
         // --- FINE OCR SCONTRINI ---
 
