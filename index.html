@@ -145,19 +145,7 @@
                     <i data-lucide="home" class="w-4 h-4 flex-shrink-0"></i> Casa
                 </h3>
                 <ul class="space-y-1">
-                    <li>
-                        <button onclick="document.getElementById('sub-condominio').classList.toggle('hidden'); document.getElementById('icon-condominio').classList.toggle('rotate-180');" class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors">
-                            <div class="flex items-center">
-                                <span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Condominio
-                            </div>
-                            <i data-lucide="chevron-down" id="icon-condominio" class="w-4 h-4 transition-transform"></i>
-                        </button>
-                        <ul id="sub-condominio" class="mt-1 space-y-1 pl-4">
-                            <li><button onclick="cambiaVista('casa', 'Rate Condominio', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Rate</button></li>
-                            <li><button onclick="cambiaVista('casa', 'Verbali Riunioni', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Verbali</button></li>
-                            <li><button onclick="cambiaVista('casa', 'Rendiconti', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Rendiconti</button></li>
-                        </ul>
-                    </li>
+                    <li><button onclick="cambiaVista('casa', 'Rate Condominio', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Rate Condominio</button></li>
                     <li><button onclick="cambiaVista('casa', 'Caldaia', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Caldaia</button></li>
                     <li><button onclick="cambiaVista('casa', 'Varie', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Varie</button></li>
                 </ul>
@@ -170,10 +158,10 @@
                 </h3>
                 <ul class="space-y-1">
                     <li><button onclick="cambiaVista('cibo', 'Lista della Spesa', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Lista della Spesa</button></li>
+                    <li><button onclick="cambiaVista('cibo', 'Detersivi', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Lista Detersivi</button></li>
                     <li><button onclick="cambiaVista('cibo', 'Menu Settimanale', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Menu Settimanale</button></li>
-                    <li><button onclick="cambiaVista('cibo', 'Spese Supermercato', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Spese Supermercato</button></li>
                     <li><button onclick="cambiaVista('cibo', 'Ricette', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Ricette</button></li>
-                    <li><button onclick="cambiaVista('cibo', 'Detersivi', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Detersivi</button></li>
+                    <li><button onclick="cambiaVista('cibo', 'Spese Supermercato', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-3 flex-shrink-0"></span>Spese Supermercato</button></li>
                 </ul>
             </div>
 
@@ -255,10 +243,6 @@
                             <li><button onclick="cambiaVista('admin', 'Utenti', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Utenti & Permessi</button></li>
                             <li><button onclick="cambiaVista('admin', 'Sessioni', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Sessioni Attive</button></li>
                             <li><button onclick="cambiaVista('admin', 'Audit Log', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Audit Log</button></li>
-                            <li><button onclick="cambiaVista('admin', 'Errori e Segnalazioni', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Errori di Sistema</button></li>
-                            <li><button onclick="cambiaVista('admin', 'Test e Prove', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Ambiente di Prova</button></li>
-                            <li><button onclick="cambiaVista('admin', 'Manutenzione Dati', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Manutenzione Dati</button></li>
-                            <li><button onclick="cambiaVista('admin', 'Verifica Campi', this)" class="w-full flex items-center px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white text-sm text-left transition-colors menu-btn"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-3 flex-shrink-0"></span>Verifica Campi DB</button></li>
                         </ul>
                     </li>
                 </ul>
@@ -334,7 +318,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "11.11.2026_11.53";
+        const CURRENT_APP_VERSION = "11.11.2026_12.15";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -846,8 +830,13 @@
                 container.innerHTML = creaHtmlScadenzario();
             }
             else if (window.appState.vistaAttuale === 'casa') {
-                actions.innerHTML = puoModificare('casa') ? `<button onclick="apriModaleCasa()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Voce</button>` : '';
-                container.innerHTML = creaHtmlCasa(window.appState.sottoCategoria);
+                if (window.appState.sottoCategoria === 'Rate Condominio') {
+                    actions.innerHTML = puoModificare('casa') ? `<button onclick="window.apriModaleRataCondominio()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Rata</button>` : '';
+                    container.innerHTML = window.creaHtmlRateCondominio();
+                } else {
+                    actions.innerHTML = puoModificare('casa') ? `<button onclick="apriModaleCasa()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center md:justify-start gap-2 shadow-sm transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> Aggiungi Voce</button>` : '';
+                    container.innerHTML = creaHtmlCasa(window.appState.sottoCategoria);
+                }
             }
             else if (window.appState.vistaAttuale === 'veicoli') {
                 if (window.appState.sottoCategoria === 'I Miei Mezzi') {
@@ -1157,6 +1146,216 @@
                 </div>
             `;
         }
+
+        // ==========================================
+        // VISTA E LOGICA: RATE CONDOMINIO
+        // ==========================================
+        window.creaHtmlRateCondominio = () => {
+            const voci = (window.appState.dati.scadenze_casa || []).filter(v => v.sottoCategoria === 'Rate Condominio');
+            
+            // Raggruppa per Anno Solare
+            const anni = {};
+            voci.forEach(r => {
+                const d = new Date(r.data);
+                const y = r.data ? d.getFullYear() : 'N/D';
+                if (!anni[y]) anni[y] = { ordinarie: 0, straordinarie: 0, saldi: 0, versato: 0, da_versare: 0 };
+                
+                const imp = parseFloat(r.importo) || 0;
+                
+                if (r.completato) {
+                    if (r.titolo === 'Rata Ordinaria') anni[y].ordinarie += imp;
+                    else if (r.titolo === 'Rata Straordinaria') anni[y].straordinarie += imp;
+                    else if (r.titolo === 'Saldo Consuntivo') anni[y].saldi += imp;
+                    else anni[y].ordinarie += imp;
+                    anni[y].versato += imp;
+                } else {
+                    anni[y].da_versare += imp;
+                }
+            });
+
+            // Crea HTML tabella riepilogo anni
+            const anniKeys = Object.keys(anni).sort((a,b) => b - a); // Decrescente
+            let htmlRiepilogo = '';
+            if (anniKeys.length > 0) {
+                htmlRiepilogo = `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-6">
+                    <div class="bg-blue-50 p-3 border-b border-slate-200">
+                        <h4 class="font-bold text-blue-900 text-sm flex items-center gap-2"><i data-lucide="bar-chart-3" class="w-4 h-4"></i> Riepilogo per Anno Solare</h4>
+                    </div>
+                    <table class="w-full text-left text-sm min-w-max">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="py-2 px-4">Anno</th>
+                                <th class="py-2 px-4 text-right">R. Ordinarie</th>
+                                <th class="py-2 px-4 text-right">R. Straordinarie</th>
+                                <th class="py-2 px-4 text-right">Saldi Consuntivi</th>
+                                <th class="py-2 px-4 text-right font-bold text-emerald-600">Tot. Versato</th>
+                                <th class="py-2 px-4 text-right font-bold text-orange-600">Da Versare (Prev.)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${anniKeys.map(y => `
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 px-4 font-bold text-slate-800">${y}</td>
+                                <td class="py-2 px-4 text-right text-slate-600">€ ${anni[y].ordinarie.toFixed(2)}</td>
+                                <td class="py-2 px-4 text-right text-slate-600">€ ${anni[y].straordinarie.toFixed(2)}</td>
+                                <td class="py-2 px-4 text-right text-slate-600">€ ${anni[y].saldi.toFixed(2)}</td>
+                                <td class="py-2 px-4 text-right font-bold text-emerald-600 bg-emerald-50/50">€ ${anni[y].versato.toFixed(2)}</td>
+                                <td class="py-2 px-4 text-right font-bold text-orange-600 bg-orange-50/50">€ ${anni[y].da_versare.toFixed(2)}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+
+            // Dettaglio Voci
+            voci.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+            let htmlDettaglio = '';
+            if (voci.length === 0) {
+                htmlDettaglio = `<div class="text-center py-10 text-slate-400"><i data-lucide="building" class="w-12 h-12 mx-auto mb-3 opacity-50"></i><p>Nessuna rata condominiale registrata.</p></div>`;
+            } else {
+                htmlDettaglio = `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                    <div class="bg-slate-50 p-3 border-b border-slate-200">
+                        <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="list" class="w-4 h-4"></i> Dettaglio Registrazioni</h4>
+                    </div>
+                    <table class="w-full text-left text-sm min-w-max">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">Stato</th>
+                                <th class="py-3 px-4">Tipo / Note</th>
+                                <th class="py-3 px-4">Data Scadenza/Pagamento</th>
+                                <th class="py-3 px-4 text-right">Importo (€)</th>
+                                <th class="py-3 px-4 text-right">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${voci.map(v => {
+                                const countAl = window.countAllegati(v.id);
+                                const safeTitolo = window.escapeStr(v.titolo);
+                                const badgeStato = v.completato 
+                                    ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Versato</span>' 
+                                    : '<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Da Versare</span>';
+                                
+                                return `
+                                <tr class="hover:bg-slate-50 ${v.completato ? '' : 'bg-orange-50/20'}">
+                                    <td class="py-3 px-4 cursor-pointer" onclick="window.toggleStatoRata('${v.id}', ${!v.completato})">${badgeStato}</td>
+                                    <td class="py-3 px-4 text-slate-800 max-w-xs md:max-w-md break-words">
+                                        <span class="font-semibold block">${v.titolo}</span>
+                                        ${v.note ? `<span class="text-xs text-slate-500 font-normal mt-1 block">${window.escapeStr(v.note)}</span>` : ''}
+                                    </td>
+                                    <td class="py-3 px-4 text-slate-600 font-medium">${window.formattaDataIT(v.data)}</td>
+                                    <td class="py-3 px-4 text-slate-800 font-bold text-right">€ ${parseFloat(v.importo || 0).toFixed(2)}</td>
+                                    <td class="py-3 px-4 flex justify-end gap-2 items-center">
+                                        <button onclick="window.apriModaleAllegati('casa', '${v.id}', 'Allegati Rata')" class="${window.getGraffettaClass(v.id)} transition-colors p-1.5 rounded-md flex items-center gap-1" title="Gestisci Allegati">
+                                            <i data-lucide="paperclip" class="w-4 h-4"></i>
+                                            ${countAl > 0 ? `<span class="text-xs font-bold leading-none">${countAl}</span>` : ''}
+                                        </button>
+                                        ${window.puoModificare('casa') ? `
+                                        <button onclick="window.apriModaleRataCondominio('${v.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1.5 rounded-md border border-transparent" title="Modifica Voce">
+                                            <i data-lucide="edit" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="window.eliminaDoc('casa', '${v.id}')" class="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors p-1.5 rounded-md border border-transparent" title="Elimina Voce">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>` : ''}
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+
+            return htmlRiepilogo + htmlDettaglio;
+        };
+
+        window.toggleStatoRata = async (idStr, completato) => {
+            if (!window.puoModificare('casa')) return window.mostraNotifica("Non hai i permessi per questa operazione.", "error");
+            try {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', idStr), { completato: completato });
+                window.mostraNotifica("Stato rata aggiornato!", "success");
+            } catch(e) {
+                console.error(e);
+                window.mostraNotifica("Errore aggiornamento", "error");
+            }
+        };
+
+        window.apriModaleRataCondominio = (id = null) => {
+            let m = { titolo: 'Rata Ordinaria', data: new Date().toISOString().split('T')[0], importo: '', note: '', completato: false };
+            if (id) m = window.appState.dati.scadenze_casa.find(x => x.id === id) || m;
+            
+            window.apriModaleHTML(`${id ? 'Modifica' : 'Nuova'} Rata Condominio`, `
+                <form onsubmit="window.salvaRataCondominio(event, '${id || ''}')" class="space-y-4"> 
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Tipo Importo</label>
+                            <select id="rc-titolo" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500">
+                                <option value="Rata Ordinaria" ${m.titolo === 'Rata Ordinaria' ? 'selected' : ''}>Rata Ordinaria</option>
+                                <option value="Rata Straordinaria" ${m.titolo === 'Rata Straordinaria' ? 'selected' : ''}>Rata Straordinaria</option>
+                                <option value="Saldo Consuntivo" ${m.titolo === 'Saldo Consuntivo' ? 'selected' : ''}>Saldo (Bilancio Consuntivo)</option>
+                                <option value="Rendiconto Preventivo" ${m.titolo === 'Rendiconto Preventivo' ? 'selected' : ''}>Rendiconto Preventivo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Stato</label>
+                            <select id="rc-stato" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 ${m.completato ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'} font-bold">
+                                <option value="da_pagare" ${!m.completato ? 'selected' : ''}>Da Versare</option>
+                                <option value="pagato" ${m.completato ? 'selected' : ''}>Già Versato</option>
+                            </select>
+                        </div>
+                    </div> 
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> 
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Data Scadenza / Pagamento</label>
+                            <input type="date" id="rc-data" value="${m.data || ''}" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500">
+                        </div> 
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Importo (€)</label>
+                            <input type="number" step="0.01" id="rc-importo" value="${m.importo || ''}" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500">
+                        </div> 
+                    </div> 
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Note (es. Riferimento Trimestre o Anno)</label>
+                        <textarea id="rc-note" rows="2" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500">${window.escapeStr(m.note || '')}</textarea>
+                    </div> 
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-2 shadow-sm transition-colors flex justify-center items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Salva Rata</button> 
+                </form>
+            `);
+
+            // Cambia colore select stato dinamicamente
+            document.getElementById('rc-stato').addEventListener('change', function() {
+                if (this.value === 'pagato') {
+                    this.classList.remove('bg-orange-50', 'text-orange-700');
+                    this.classList.add('bg-emerald-50', 'text-emerald-700');
+                } else {
+                    this.classList.remove('bg-emerald-50', 'text-emerald-700');
+                    this.classList.add('bg-orange-50', 'text-orange-700');
+                }
+            });
+        };
+
+        window.salvaRataCondominio = async (e, idStr) => { 
+            e.preventDefault(); 
+            const data = { 
+                sottoCategoria: 'Rate Condominio', 
+                titolo: document.getElementById('rc-titolo').value, 
+                note: document.getElementById('rc-note').value, 
+                data: document.getElementById('rc-data').value, 
+                importo: document.getElementById('rc-importo').value, 
+                completato: document.getElementById('rc-stato').value === 'pagato',
+                ts: Date.now() 
+            };
+            if (idStr) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', idStr), data);
+            } else {
+                await addDoc(refs.casa, data); 
+            }
+            window.chiudiModale(); 
+            window.mostraNotifica("Rata salvata con successo", "success"); 
+        };
+
 // ==========================================
         function creaHtmlCasa(categoriaCorrente) {
             const voci = window.appState.dati.scadenze_casa
