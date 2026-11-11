@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestionale-family-10.11.2026_20.08';
+const CACHE_NAME = 'gestionale-family-10.11.2026_21.00';
 const LOCAL_ASSETS = [
     './',
     './index.html',
@@ -13,6 +13,7 @@ const EXTERNAL_ASSETS = [
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
     'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js',
     'https://unpkg.com/html5-qrcode',
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
     'https://unpkg.com/docx@7.8.2/build/index.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js',
