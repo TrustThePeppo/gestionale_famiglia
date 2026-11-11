@@ -8,7 +8,7 @@ Un applicativo web progressivo (PWA) leggero, portatile, utilizzabile anche offl
 - **Gestione Casa:** Controllo rate condominiali, verbali, rendiconti, caldaia e spese varie con archivio allegati.
 - **Gestione Veicoli:** Anagrafica dei mezzi (auto e moto), scadenze legali (Bollo, Assicurazione, Revisione), storico manutenzioni e calcolo automatico del prossimo tagliando (+1 anno) e inversione pneumatici.
 - **Finanze e Prestiti:** Calcolo automatico rate pagate, residuo capitale/interessi e piano di ammortamento alla francese allineato al centesimo.
-- **Alimenti e Detersivi:** Lista della spesa e detersivi interattiva (Dispensa / Carrello con supporto drag & drop e vista mobile), Menu Settimanale esportabile in PDF e Ricettario con integrazione automatica degli ingredienti nella spesa.
+- **Alimenti, Detersivi e Spese Supermercato:** Lista della spesa e detersivi interattiva (Dispensa / Carrello), contatore mensile Spese Supermercato con lettore ottico scontrini (OCR via fotocamera), Menu Settimanale esportabile in PDF e Ricettario con integrazione ingredienti.
 - **Carte e Tessere (Stocard Clone):** Portafoglio digitale con scanner fotocamera e generazione codici a barre (EAN-13, EAN-8, UPC, CODE128).
 - **Blocco Note & Agenda Condivisa:** Note rapide con ricerca ed evidenziazione, più calendario mensile condiviso per tutta la famiglia.
 - **Scadenzario & Esportazione:** Motore di ricerca scadenze per data o anno solare con esportazione in Word (`.docx`) e PDF tabellare.
