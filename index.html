@@ -314,10 +314,10 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { initializeAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, browserLocalPersistence, updatePassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "12.11.2026_18.16";
+        const CURRENT_APP_VERSION = "12.11.2026_18.42";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -328,7 +328,8 @@
         const vDisplay = document.getElementById('app-version-display');
         if (vDisplay) vDisplay.innerText = CURRENT_APP_VERSION.replace('_', ' - ');
 
-        // Inizializza Icone Iniziali
+        // Inizializza Icone Iniziali (con fallback sicuro offline)
+        const lucide = window.lucide || { createIcons: () => {} };
         lucide.createIcons();
 
         // 1. CONFIGURAZIONE FIREBASE
@@ -347,6 +348,23 @@
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
         });
+
+        // Wrapper intelligenti per scritture Firestore Offline-First:
+        // Quando non c'è rete (o c'è segnale bloccato in un supermercato), Firestore aggiorna subito la cache
+        // locale IndexedDB e la UI (tramite onSnapshot), ma la Promise originale resta in attesa del server.
+        // Sbloccando l'attesa dopo 1.5s (o subito se offline), modali e liste rispondono all'istante anche senza linea.
+        const withOfflineWrite = (promise) => {
+            promise.catch(err => console.warn("Scrittura salvata in coda offline:", err));
+            if (!navigator.onLine) return Promise.resolve();
+            return Promise.race([
+                promise,
+                new Promise(resolve => setTimeout(resolve, 1500))
+            ]);
+        };
+        const addDoc = (...args) => withOfflineWrite(fbAddDoc(...args));
+        const updateDoc = (...args) => withOfflineWrite(fbUpdateDoc(...args));
+        const setDoc = (...args) => withOfflineWrite(fbSetDoc(...args));
+        const deleteDoc = (...args) => withOfflineWrite(fbDeleteDoc(...args));
         
         // Identificativo App Fisso
         const APP_ID = 'gestionale_famiglia_pro';
@@ -584,7 +602,7 @@
             }
         };
 
-        // --- INIZIALIZZAZIONE SICURA ---
+        // --- INIZIALIZZAZIONE SICURA (OFFLINE-FIRST) ---
         function avviaApp() {
             onAuthStateChanged(auth, async (user) => {
                 const loginScreen = document.getElementById('login-screen');
@@ -596,57 +614,104 @@
                     if (wrapper) wrapper.style.display = '';
                     
                     const sanitizedEmail = user.email.replace(/\./g, '_');
-                    updateDoc(doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail), { ultima_sessione: Date.now() }).catch(e => {});
-
+                    const localProfileKey = 'gestionale_profilo_' + sanitizedEmail;
                     const userRef = doc(db, 'artifacts', APP_ID, 'utenti', sanitizedEmail);
-                    const snap = await getDoc(userRef);
-                    let data = snap.exists() ? snap.data() : null;
+
+                    // Aggiornamento sessione non bloccante
+                    if (navigator.onLine) {
+                        fbUpdateDoc(userRef, { ultima_sessione: Date.now() }).catch(() => {});
+                    }
                     
-                    // Sicurezza: identifichiamo il Super Admin tramite Hash irreversibile (SHA-256) per non esporre l'email in chiaro su GitHub
-                    const isSuperAdmin = CryptoJS.SHA256(user.email).toString() === '37b2fb4aabb55fb5c52c8d7f742498b0258b10bf936e69a98de6bbf30dac7486';
+                    // Sicurezza: identifichiamo il Super Admin tramite Hash irreversibile (SHA-256)
+                    const isSuperAdmin = (typeof CryptoJS !== 'undefined') && CryptoJS.SHA256(user.email).toString() === '37b2fb4aabb55fb5c52c8d7f742498b0258b10bf936e69a98de6bbf30dac7486';
                     
                     if (isSuperAdmin) {
-                        ADMIN_EMAIL = user.email; // Popoliamo la variabile dinamicamente
+                        ADMIN_EMAIL = user.email;
                         document.getElementById('nav-amministrazione').classList.remove('hidden');
-                        
-                        // Autocorrezione in caso di perdita del ruolo nel database
-                        if (data && data.ruolo !== 'admin') {
-                            await updateDoc(userRef, { ruolo: 'admin' });
-                            data.ruolo = 'admin';
-                        }
                     } else {
                         document.getElementById('nav-amministrazione').classList.add('hidden');
                     }
 
-                    if (snap.exists()) {
+                    const defaultData = {
+                        email: user.email,
+                        ruolo: isSuperAdmin ? 'admin' : 'standard',
+                        permessi: {
+                            casa: { view: true, edit: true },
+                            veicoli: { view: true, edit: true },
+                            prestiti: { view: true, edit: true },
+                            cibo: { view: true, edit: true },
+                            tessere: { view: true, edit: true },
+                            note: { view: true, edit: true },
+                            calendario: { view: true, edit: true }
+                        },
+                        ts: Date.now()
+                    };
+
+                    // 1. Recupero profilo con fallback immediato su Cache Firestore e localStorage (non fallisce mai offline)
+                    let data = null;
+                    let docExistsOnServer = false;
+
+                    try {
+                        let snap = null;
+                        if (navigator.onLine) {
+                            // Timeout di 2 secondi per evitare blocchi in zone con segnale finto/assente (es. supermercato)
+                            snap = await Promise.race([
+                                getDoc(userRef),
+                                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout_rete')), 2000))
+                            ]);
+                        } else {
+                            snap = await getDocFromCache(userRef);
+                        }
+                        if (snap && snap.exists()) {
+                            data = snap.data();
+                            docExistsOnServer = true;
+                        }
+                    } catch (err) {
+                        // Se getDoc fallisce o va in timeout per assenza di linea, proviamo la cache locale di Firestore
+                        try {
+                            const cacheSnap = await getDocFromCache(userRef);
+                            if (cacheSnap && cacheSnap.exists()) {
+                                data = cacheSnap.data();
+                                docExistsOnServer = true;
+                            }
+                        } catch (cacheErr) {}
+                    }
+
+                    // Se non era nella cache di Firestore, leggiamo l'ultimo profilo salvato in localStorage
+                    if (!data) {
+                        try {
+                            const savedLocal = localStorage.getItem(localProfileKey);
+                            if (savedLocal) {
+                                data = JSON.parse(savedLocal);
+                                docExistsOnServer = true;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (data) {
+                        if (isSuperAdmin && data.ruolo !== 'admin') {
+                            data.ruolo = 'admin';
+                            if (navigator.onLine) updateDoc(userRef, { ruolo: 'admin' });
+                        }
                         window.appState.utenteCorrenteDati = data;
+                        try { localStorage.setItem(localProfileKey, JSON.stringify(data)); } catch (e) {}
                         applicaPermessiMenu();
                     } else {
-                        const defaultData = {
-                            email: user.email,
-                            ruolo: isSuperAdmin ? 'admin' : 'standard',
-                            permessi: {
-                                casa: { view: true, edit: true },
-                                veicoli: { view: true, edit: true },
-                                prestiti: { view: true, edit: true },
-                                cibo: { view: true, edit: true },
-                                tessere: { view: true, edit: true },
-                                    note: { view: true, edit: true },
-                                calendario: { view: true, edit: true }
-                            },
-                            ts: Date.now()
-                        };
-                        await setDoc(userRef, defaultData);
+                        // Solo se siamo realmente online e il profilo non esiste ancora lo creiamo sul DB
+                        if (navigator.onLine) {
+                            setDoc(userRef, defaultData);
+                        }
                         window.appState.utenteCorrenteDati = defaultData;
+                        try { localStorage.setItem(localProfileKey, JSON.stringify(defaultData)); } catch (e) {}
                         applicaPermessiMenu();
                     }
 
                     const btn = document.getElementById('login-btn');
-                    if(btn) btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
+                    if (btn) btn.innerHTML = '<span>Accedi al Gestionale</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>';
                     
-                    mostraNotifica(`Accesso sicuro completato!`, 'success');
+                    mostraNotifica(navigator.onLine ? 'Accesso sicuro completato!' : 'Avviato in Modalità Offline', 'success');
                     
-                    // Fondamentale: caricaDatiDatabase() deve essere chiamato SOLO DOPO aver identificato il Super Admin
+                    // Fondamentale: caricaDatiDatabase() viene sempre eseguito anche senza linea
                     caricaDatiDatabase();
                 } else {
                     loginScreen.classList.remove('hidden');
@@ -690,6 +755,17 @@
             }, (err) => console.error("Errore lettura allegati:", err));
 
             refs.utenti = collection(db, 'artifacts', APP_ID, 'utenti');
+            if (auth.currentUser) {
+                const mySanitizedEmail = auth.currentUser.email.replace(/\./g, '_');
+                onSnapshot(doc(db, 'artifacts', APP_ID, 'utenti', mySanitizedEmail), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const myData = docSnap.data();
+                        window.appState.utenteCorrenteDati = myData;
+                        try { localStorage.setItem('gestionale_profilo_' + mySanitizedEmail, JSON.stringify(myData)); } catch (e) {}
+                        applicaPermessiMenu();
+                    }
+                }, (err) => console.warn("Lettura profilo utente:", err));
+            }
             if (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) {
                 onSnapshot(refs.utenti, (snap) => {
                     window.appState.dati.utenti = [];
