@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "12.11.2026_15.01";
+        const CURRENT_APP_VERSION = "12.11.2026_17.47";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -407,10 +407,33 @@
             return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataStr;
         };
 
-        // Helper per sanitizzare stringhe in attributi HTML
+        // Helper per ottenere YYYY-MM-DD sul fuso orario locale (evita lo scarto UTC di toISOString)
+        window.toISODateLocal = (d = new Date()) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        // Helper per sanitizzare stringhe nel testo HTML e negli attributi value="..." (senza barra davanti agli apostrofi)
         window.escapeStr = (str) => {
             if (!str) return '';
-            return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        };
+
+        // Helper specifico per stringhe passate dentro argomenti JS in onclick="..."
+        window.escapeJsStr = (str) => {
+            if (!str) return '';
+            return String(str)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '&quot;')
+                .replace(/\n/g, ' ')
+                .replace(/\r/g, '');
         };
 
         
@@ -993,7 +1016,7 @@
                             scadenzeAlert.push({
                                 origine: `Mezzo: ${v.marcaModello}`,
                                 descrizione: 'Prossimo Tagliando (Stimato)',
-                                data: d.toISOString().split('T')[0],
+                                data: window.toISODateLocal(d),
                                 dataObj: d,
                                 giorniMancanti: diffDays,
                                 importo: '',
@@ -1232,7 +1255,7 @@
                         <tbody class="divide-y divide-slate-100">
                             ${voci.map(v => {
                                 const countAl = window.countAllegati(v.id);
-                                const safeTitolo = window.escapeStr(v.titolo);
+                                const safeTitolo = window.escapeJsStr(v.titolo);
                                 const badgeStato = v.completato 
                                     ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Versato</span>' 
                                     : '<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Da Versare</span>';
@@ -1282,7 +1305,7 @@
         };
 
         window.apriModaleRataCondominio = (id = null) => {
-            let m = { titolo: 'Rata Ordinaria', data: new Date().toISOString().split('T')[0], importo: '', note: '', completato: false };
+            let m = { titolo: 'Rata Ordinaria', data: window.toISODateLocal(), importo: '', note: '', completato: false };
             if (id) m = window.appState.dati.scadenze_casa.find(x => x.id === id) || m;
             
             window.apriModaleHTML(`${id ? 'Modifica' : 'Nuova'} Rata Condominio`, `
@@ -1348,8 +1371,10 @@
             };
             if (idStr) {
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', idStr), data);
+                window.registraAudit('Modifica', `Modificata rata condominio: ${data.titolo}`);
             } else {
                 await addDoc(refs.casa, data); 
+                window.registraAudit('Creazione', `Nuova rata condominio: ${data.titolo}`);
             }
             window.chiudiModale(); 
             window.mostraNotifica("Rata salvata con successo", "success"); 
@@ -1380,7 +1405,7 @@
             
             voci.forEach(v => {
                 const countAl = window.countAllegati(v.id);
-                const safeTitolo = window.escapeStr(v.titolo);
+                const safeTitolo = window.escapeJsStr(v.titolo);
                 html += `
                     <tr class="hover:bg-slate-50">
                         <td class="py-3 px-4 text-slate-800 max-w-xs md:max-w-md break-words">
@@ -1423,7 +1448,7 @@
 
             return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">` + veicoli.map(v => {
                 const countAl = window.countAllegati(v.id);
-                const safeNome = window.escapeStr(v.marcaModello);
+                const safeNome = window.escapeJsStr(v.marcaModello);
                 return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col relative">
                     <div class="absolute top-4 right-4 flex gap-1 md:gap-2">
@@ -1486,7 +1511,7 @@
                     scadenze.push({
                         isVirtual: true,
                         tipoIntervento: 'Prossimo Tagliando (Stimato)',
-                        data: d.toISOString().split('T')[0],
+                        data: window.toISODateLocal(d),
                         importo: '',
                         lavori: '1 anno dopo l\'ultimo (' + window.formattaDataIT(lastTag.data) + ')'
                     });
@@ -1509,7 +1534,7 @@
 
                 const renderRow = (m, isScadenza) => {
                     const countAl = window.countAllegati(m.idMan);
-                    const safeTipo = window.escapeStr(m.tipoIntervento);
+                    const safeTipo = window.escapeJsStr(m.tipoIntervento);
                     return `
                     <tr class="hover:bg-slate-50 border-b border-slate-100 last:border-0 block md:table-row py-3 md:py-0">
                         <td class="py-1 md:py-3 px-4 font-medium block md:table-cell ${isScadenza ? 'text-orange-700' : 'text-slate-800'}">
@@ -1652,7 +1677,7 @@
                 }
 
                 const countAl = window.countAllegati(p.id);
-                const safeNome = window.escapeStr(p.nome);
+                const safeNome = window.escapeJsStr(p.nome);
                 
                 return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col relative">
@@ -1787,7 +1812,7 @@
                     <strong>Sincronizzazione Automatica Quadro Generale:</strong> Il riepilogo mattutino (inviato tra le 08:00 e le 09:00) controlla automaticamente le voci attive del Quadro Generale:
                     <ul class="list-disc pl-5 mt-2 space-y-1 text-xs text-blue-800">
                         <li><strong>Veicoli:</strong> Scadenze Bollo, Assicurazione, Revisione, Prossimo Tagliando stimato (+1 anno) e Prossima Inversione/Sostituzione Pneumatici.</li>
-                        <li><strong>Casa:</strong> Scadenze non completate nelle sezioni <em>Caldaia</em> e <em>Varie</em>.</li>
+                        <li><strong>Casa:</strong> Scadenze non completate nelle sezioni <em>Rate Condominio</em>, <em>Caldaia</em> e <em>Varie</em>.</li>
                         <li><strong>Agenda Condivisa:</strong> Eventi con la spunta <em>"Ricordami questo evento nel Quadro Generale"</em> attiva.</li>
                     </ul>
                 </div>
@@ -2143,7 +2168,7 @@
             const giorniNelMese = new Date(anno, mese + 1, 0).getDate();
             
             const eventi = window.appState.dati.calendario || [];
-            const dataOggi = new Date().toISOString().split('T')[0];
+            const dataOggi = window.toISODateLocal();
             
             let celle = '';
             for(let i=0; i<offset; i++) celle += `<div class="bg-slate-50/30 border border-slate-100 min-h-[90px] rounded-lg"></div>`;
@@ -2207,7 +2232,7 @@
         };
 
         window.apriModaleEvento = (id = null) => {
-            let e = { titolo: '', data: new Date().toISOString().split('T')[0], data_al: '', colore: 'bg-blue-500', orario: '', note: '', alert: false, alert_days: '1' };
+            let e = { titolo: '', data: window.toISODateLocal(), data_al: '', colore: 'bg-blue-500', orario: '', note: '', alert: false, alert_days: '1' };
             if (id) e = window.appState.dati.calendario.find(x => x.id === id) || e;
             
             apriModaleHTML(`${id ? 'Modifica' : 'Nuovo'} Evento in Agenda`, `
@@ -2301,8 +2326,10 @@
             }
             if (idStr) {
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'calendario', idStr), data);
+                window.registraAudit('Modifica', `Modificato evento agenda: ${data.titolo}`);
             } else {
                 await addDoc(refs.calendario, data); 
+                window.registraAudit('Creazione', `Nuovo evento agenda: ${data.titolo}`);
             }
             chiudiModale(); 
             mostraNotifica("Evento salvato in agenda!", "success"); 
@@ -2343,12 +2370,25 @@
                 if (s.data) {
                     scadenzeTrovate.push({
                         origine: `Casa - ${s.sottoCategoria}`,
-                        descrizione: s.titolo + (s.note ? ` (${s.note})` : ''),
+                        descrizione: s.titolo + (s.note ? ` (${s.note})` : '') + (s.completato ? ' [COMPLETATO]' : ''),
                         data: s.data,
                         importo: s.importo
                     });
                 }
             });
+
+            if (window.appState.dati.calendario) {
+                window.appState.dati.calendario.forEach(ev => {
+                    if (ev.data && ev.alert) {
+                        scadenzeTrovate.push({
+                            origine: 'Agenda Condivisa',
+                            descrizione: ev.titolo + (ev.orario ? ` (H. ${ev.orario})` : ''),
+                            data: ev.data,
+                            importo: ''
+                        });
+                    }
+                });
+            }
 
             const tipiScadenze = ['Scadenza Bollo', 'Scadenza Assicurazione', 'Scadenza Revisione'];
             window.appState.dati.veicoli.forEach(v => {
@@ -2364,7 +2404,7 @@
                     if (tagliandi.length > 0) {
                         const d = new Date(tagliandi[0].data);
                         d.setFullYear(d.getFullYear() + 1); 
-                        scadenzeTrovate.push({ origine: `Veicolo - ${v.marcaModello}`, descrizione: 'Prossimo Tagliando (Stimato)', data: d.toISOString().split('T')[0], importo: '' });
+                        scadenzeTrovate.push({ origine: `Veicolo - ${v.marcaModello}`, descrizione: 'Prossimo Tagliando (Stimato)', data: window.toISODateLocal(d), importo: '' });
                     }
                     
                     const inversioni = interventi.filter(m => (m.tipoIntervento === 'Inversione Pneumatici' || m.tipoIntervento === 'Sostituzione Pneumatici') && m.dataProssima);
@@ -2448,7 +2488,7 @@
             const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
             const paragrafi = [
                 new Paragraph({ text: "Scadenzario - Gestionale Famiglia", heading: HeadingLevel.HEADING_1 }),
-                new Paragraph({ text: "Generato il: " + window.formattaDataIT(new Date().toISOString().split('T')[0]) }),
+                new Paragraph({ text: "Generato il: " + window.formattaDataIT(window.toISODateLocal()) }),
                 new Paragraph({ text: "" })
             ];
             window.scadenzeTrovateExport.forEach(scad => {
@@ -2482,7 +2522,7 @@
             docPdf.setFontSize(16);
             docPdf.text("Tabella Scadenze - Gestionale Famiglia", 14, 20);
             docPdf.setFontSize(10);
-            docPdf.text("Generato il: " + window.formattaDataIT(new Date().toISOString().split('T')[0]), 14, 26);
+            docPdf.text("Generato il: " + window.formattaDataIT(window.toISODateLocal()), 14, 26);
             const tableRows = [];
             window.scadenzeTrovateExport.forEach(scad => {
                 tableRows.push([
@@ -2627,8 +2667,14 @@
                 dataPossesso: document.getElementById('v-possesso').value, 
                 ts: Date.now() 
             };
-            if (idStr) await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', idStr), data);
-            else { data.manutenzioni = []; await addDoc(refs.veicoli, data); }
+            if (idStr) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', idStr), data);
+                window.registraAudit('Modifica', `Modificato veicolo: ${data.marcaModello}`);
+            } else {
+                data.manutenzioni = [];
+                await addDoc(refs.veicoli, data);
+                window.registraAudit('Creazione', `Registrato veicolo: ${data.marcaModello}`);
+            }
             chiudiModale();
             mostraNotifica("Veicolo salvato!", "success"); 
         };
@@ -2736,6 +2782,7 @@
             } 
             nuoveManutenzioni.sort((a, b) => new Date(b.data) - new Date(a.data)); 
             await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', id), { manutenzioni: nuoveManutenzioni }); 
+            window.registraAudit(idManStr ? 'Modifica' : 'Creazione', `${idManStr ? 'Modificata' : 'Nuova'} voce veicolo (${veicolo.marcaModello}): ${newData.tipoIntervento}`);
             chiudiModale();
             mostraNotifica("Voce salvata con successo", "success"); 
         };
@@ -2823,9 +2870,11 @@
             };
             if (idStr) {
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'prestiti', idStr), data);
+                window.registraAudit('Modifica', `Modificato finanziamento: ${data.nome}`);
             } else {
                 data.ratePagate = 0; 
                 await addDoc(refs.prestiti, data); 
+                window.registraAudit('Creazione', `Nuovo finanziamento: ${data.nome}`);
             }
             chiudiModale(); 
             mostraNotifica("Finanziamento salvato!", "success"); 
@@ -3704,7 +3753,7 @@
         };
 
         window.apriModaleScontrino = (id = null) => {
-            let s = { data: new Date().toISOString().split('T')[0], supermercato: '', importo: '' };
+            let s = { data: window.toISODateLocal(), supermercato: '', importo: '' };
             if (id) s = window.appState.dati.spese_supermercato.find(x => x.id === id) || s;
             
             window.apriModaleHTML(`${id ? 'Modifica' : 'Nuovo'} Scontrino`, `
@@ -3893,7 +3942,7 @@
             const menuDaCaricare = (window.appState.dati.cibo_menu_salvati || []).find(m => m.id === idMenu);
             if (!menuDaCaricare) return;
 
-            window.chiediConferma("Sei sicuro di voler sovrascrivere il menu attuale con '" + window.escapeStr(menuDaCaricare.nome) + "'?", async () => {
+            window.chiediConferma("Sei sicuro di voler sovrascrivere il menu attuale con '" + (menuDaCaricare.nome || '') + "'?", async () => {
                 mostraNotifica("Caricamento in corso...", "info");
                 chiudiModale();
                 
@@ -4034,7 +4083,7 @@
                 return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-5 flex flex-col relative">
                     <div class="absolute top-3 right-3 flex gap-1">
-                        <button onclick="apriModaleAllegati('cibo_ricette', '${r.id}', 'Foto Ricetta ${window.escapeStr(r.nome)}')" class="${countAl > 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-50 text-slate-400 hover:text-orange-600 hover:bg-orange-50 border-slate-100'} transition-colors p-1.5 rounded-md border flex items-center gap-1" title="Foto Ricetta">
+                        <button onclick="apriModaleAllegati('cibo_ricette', '${r.id}', 'Foto Ricetta ${window.escapeJsStr(r.nome)}')" class="${countAl > 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-50 text-slate-400 hover:text-orange-600 hover:bg-orange-50 border-slate-100'} transition-colors p-1.5 rounded-md border flex items-center gap-1" title="Foto Ricetta">
                             <i data-lucide="image" class="w-3.5 h-3.5"></i> ${countAl > 0 ? `<span class="text-[10px] font-bold leading-none">${countAl}</span>` : ''}
                         </button>
                         ${puoModificare('cibo') ? `<button onclick="apriModaleRicetta('${r.id}')" class="bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100 transition-colors p-1.5 rounded-md" title="Modifica"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
@@ -4328,7 +4377,7 @@
                 const dataFormat = new Date(n.ts).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
                 const testoSafe = window.escapeStr(n.testo);
                 const countAl = window.countAllegati(n.id);
-                const safeTitolo = window.escapeStr(n.titolo);
+                const safeTitolo = window.escapeJsStr(n.titolo);
                 
                 const isMatch = term !== '' && ((n.titolo && n.titolo.toLowerCase().includes(term)) || (n.testo && n.testo.toLowerCase().includes(term)));
                 const highlightClass = isMatch ? 'nota-evidenziata ring-4 ring-amber-500 scale-[1.02] shadow-lg bg-amber-100' : 'bg-yellow-50';
@@ -4384,8 +4433,10 @@
             };
             if (idStr) {
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'note', idStr), data);
+                window.registraAudit('Modifica', `Modificata nota: ${data.titolo}`);
             } else {
                 await addDoc(refs.note, data); 
+                window.registraAudit('Creazione', `Nuova nota: ${data.titolo}`);
             }
             chiudiModale(); 
             mostraNotifica("Nota salvata correttamente!", "success"); 
