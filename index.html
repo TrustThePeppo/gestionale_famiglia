@@ -101,14 +101,14 @@
     <!-- MODALE DI CONFERMA PERSONALIZZATA (Sostituisce confirm() bloccato in iframe) -->
     <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
-            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            <div id="confirm-icon-container" class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+                <i id="confirm-icon" data-lucide="alert-triangle" class="w-6 h-6"></i>
             </div>
             <h3 class="text-lg font-bold text-slate-800 mb-2">Conferma Operazione</h3>
             <p id="confirm-text" class="text-sm text-slate-500 mb-6">Sei sicuro di voler procedere con l'eliminazione?</p>
             <div class="flex gap-3">
                 <button onclick="chiudiConferma(false)" class="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors">Annulla</button>
-                <button onclick="chiudiConferma(true)" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm">Elimina</button>
+                <button onclick="chiudiConferma(true)" id="confirm-btn-action" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm">Elimina</button>
             </div>
         </div>
     </div>
@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "12.11.2026_19.12";
+        const CURRENT_APP_VERSION = "13.11.2026_10.37";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -400,9 +400,26 @@
 
         // Gestione Conferma Personalizzata
         let confirmCallback = null;
-        window.chiediConferma = (messaggio, callback) => {
+        window.chiediConferma = (messaggio, callback, tipo = 'elimina') => {
             document.getElementById('confirm-text').innerText = messaggio;
             confirmCallback = callback;
+            
+            const btnAction = document.getElementById('confirm-btn-action');
+            const iconContainer = document.getElementById('confirm-icon-container');
+            const icon = document.getElementById('confirm-icon');
+            
+            if (tipo === 'reset') {
+                btnAction.innerText = 'Procedi';
+                btnAction.className = 'flex-1 py-2.5 rounded-lg bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors shadow-sm';
+                if(iconContainer) iconContainer.className = 'w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4';
+                if(icon) icon.setAttribute('data-lucide', 'mail-warning');
+            } else {
+                btnAction.innerText = 'Elimina';
+                btnAction.className = 'flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm';
+                if(iconContainer) iconContainer.className = 'w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4';
+                if(icon) icon.setAttribute('data-lucide', 'alert-triangle');
+            }
+            
             const modal = document.getElementById('confirm-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1859,8 +1876,8 @@
                     <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 text-sm text-blue-900">
                         <strong>Controllo Accessi e Permessi:</strong> Crea nuovi utenti e gestisci le sezioni che possono visualizzare o modificare.
                     </div>
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                        <table class="w-full text-left text-sm">
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+                        <table class="w-full text-left text-sm min-w-max">
                             <thead class="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                     <th class="py-3 px-4">Utente / Email</th>
@@ -1934,8 +1951,8 @@
                 }).join('');
 
                 content = `
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                        <table class="w-full text-left text-sm">
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+                        <table class="w-full text-left text-sm min-w-max">
                             <thead class="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                     <th class="py-3 px-4">Utente</th>
@@ -1971,8 +1988,8 @@
                 }).join('');
 
                 content = `
-                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden max-h-[70vh] overflow-y-auto">
-                        <table class="w-full text-left text-sm">
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto max-h-[70vh] overflow-y-auto">
+                        <table class="w-full text-left text-sm min-w-max">
                             <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 shadow-sm">
                                 <tr>
                                     <th class="py-3 px-4">Data e Ora</th>
@@ -2142,7 +2159,7 @@
 
         // --- RESET PASSWORD AMMINISTRATORE ---
         window.inviaResetPassword = (emailUtente) => {
-            window.chiediConferma(`Vuoi inviare un'email a ${emailUtente} con il link sicuro per resettare la password?`, async () => {
+            window.chiediConferma(`Sei sicuro di voler inviare un'email a ${emailUtente} con il link sicuro per resettare la password?`, async () => {
                 try {
                     await sendPasswordResetEmail(auth, emailUtente);
                     mostraNotifica("Email di reset inviata con successo!", "success");
@@ -2151,7 +2168,7 @@
                     console.error("Errore reset:", error);
                     mostraNotifica("Errore nell'invio dell'email.", "error");
                 }
-            });
+            }, 'reset');
         };
 
         // --- GESTIONE PERMESSI UTENTE ---
