@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "13.11.2026_10.48";
+        const CURRENT_APP_VERSION = "13.11.2026_11.26";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -1402,11 +1402,37 @@
             }
         };
 
+        window.copiaUltimaRataCondominio = () => {
+            const rate = (window.appState.dati.scadenze_casa || []).filter(v => v.sottoCategoria === 'Rate Condominio');
+            if (rate.length === 0) {
+                return window.mostraNotifica("Nessuna rata precedente trovata.", "error");
+            }
+            rate.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+            const ultima = rate[0];
+            
+            document.getElementById('rc-titolo').value = ultima.titolo || 'Rata Ordinaria';
+            document.getElementById('rc-importo').value = ultima.importo || '';
+            document.getElementById('rc-note').value = ultima.note || '';
+            
+            window.mostraNotifica("Tipo, importo e note copiati!", "success");
+        };
+
         window.apriModaleRataCondominio = (id = null) => {
             let m = { titolo: 'Rata Ordinaria', data: window.toISODateLocal(), importo: '', note: '', completato: false };
             if (id) m = window.appState.dati.scadenze_casa.find(x => x.id === id) || m;
             
+            let btnCopiaHtml = '';
+            if (!id) {
+                btnCopiaHtml = `
+                <div class="mb-4 flex justify-end">
+                    <button type="button" onclick="window.copiaUltimaRataCondominio()" class="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm border border-blue-200">
+                        <i data-lucide="copy" class="w-4 h-4"></i> Copia dati ultima rata
+                    </button>
+                </div>`;
+            }
+
             window.apriModaleHTML(`${id ? 'Modifica' : 'Nuova'} Rata Condominio`, `
+                ${btnCopiaHtml}
                 <form onsubmit="window.salvaRataCondominio(event, '${id || ''}')" class="space-y-4"> 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -4592,8 +4618,9 @@
                     } else if (collezione === 'veicoli') {
                         const v = window.appState.dati.veicoli.find(x => x.id === id);
                         if (v && v.manutenzioni) {
-                            const nuoveMan = [...v.manutenzioni];
+                            let nuoveMan = [...v.manutenzioni];
                             const idx = nuoveMan.findIndex(m => m.idMan === subId);
+                            
                             if (idx > -1) {
                                 const m = nuoveMan[idx];
                                 m.completato = true;
@@ -4604,24 +4631,51 @@
                                     let addYears = (m.tipoIntervento === 'Scadenza Revisione') ? 2 : 1;
                                     oldData.setFullYear(oldData.getFullYear() + addYears);
                                     
+                                    const newIdMan = 'man_' + Date.now() + Math.floor(Math.random() * 1000);
                                     const newScadenza = {
-                                        idMan: 'man_' + Date.now() + Math.floor(Math.random() * 1000),
+                                        idMan: newIdMan,
                                         tipoIntervento: m.tipoIntervento,
                                         data: window.toISODateLocal(oldData),
                                         dataProssima: '',
                                         km: '',
-                                        importo: '', // Vuoto per obbligare all'inserimento
-                                        lavori: `Rinnovo automatico da scadenza precedente.`,
+                                        importo: m.importo || '', 
+                                        lavori: m.lavori || '',
                                         completato: false
                                     };
-                                    nuoveMan.push(newScadenza);
+                                    
+                                    // Sostituisci la vecchia scadenza con la nuova (mantiene storico pulito)
+                                    nuoveMan[idx] = newScadenza;
+                                    
+                                    // Duplica eventuali allegati dalla vecchia scadenza a quella nuova
+                                    const allegatiVecchi = (window.appState.dati.allegati || []).filter(a => a.refId === subId);
+                                    for (const al of allegatiVecchi) {
+                                        try {
+                                            await addDoc(refs.allegati, {
+                                                refId: newIdMan,
+                                                collezioneOrigine: al.collezioneOrigine,
+                                                nomeFile: al.nomeFile,
+                                                tipo: al.tipo,
+                                                dimensione: al.dimensione,
+                                                datiBase64: al.datiBase64,
+                                                ts: Date.now()
+                                            });
+                                        } catch (e) {
+                                            console.warn("Errore duplicazione allegato auto-rinnovo:", e);
+                                        }
+                                    }
+                                    
+                                    // Rimuovi allegati collegati al vecchio ID
+                                    for (const al of allegatiVecchi) {
+                                        await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'allegati', al.id));
+                                    }
+
                                 }
                                 
                                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', id), { manutenzioni: nuoveMan });
                             }
                         }
                     }
-                    mostraNotifica("Avviso rimosso dal Quadro Generale!", "success");
+                    mostraNotifica("Avviso completato! Scadenze aggiornate.", "success");
                 } catch(e) {
                     console.error(e);
                     mostraNotifica("Errore durante l'aggiornamento", "error");
