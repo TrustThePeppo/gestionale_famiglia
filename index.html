@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "13.11.2026_11.26";
+        const CURRENT_APP_VERSION = "13.11.2026_11.39";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -1414,7 +1414,12 @@
             document.getElementById('rc-importo').value = ultima.importo || '';
             document.getElementById('rc-note').value = ultima.note || '';
             
-            window.mostraNotifica("Tipo, importo e note copiati!", "success");
+            const statoSelect = document.getElementById('rc-stato');
+            statoSelect.value = ultima.completato ? 'pagato' : 'da_pagare';
+            // trigger the event to update classes
+            statoSelect.dispatchEvent(new Event('change'));
+            
+            window.mostraNotifica("Tipo, importo, note e stato copiati!", "success");
         };
 
         window.apriModaleRataCondominio = (id = null) => {
