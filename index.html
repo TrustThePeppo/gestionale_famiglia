@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "13.11.2026_10.37";
+        const CURRENT_APP_VERSION = "13.11.2026_10.48";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -413,6 +413,11 @@
                 btnAction.className = 'flex-1 py-2.5 rounded-lg bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors shadow-sm';
                 if(iconContainer) iconContainer.className = 'w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4';
                 if(icon) icon.setAttribute('data-lucide', 'mail-warning');
+            } else if (tipo === 'completa') {
+                btnAction.innerText = 'Conferma';
+                btnAction.className = 'flex-1 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-sm';
+                if(iconContainer) iconContainer.className = 'w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4';
+                if(icon) icon.setAttribute('data-lucide', 'check-circle');
             } else {
                 btnAction.innerText = 'Elimina';
                 btnAction.className = 'flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm';
@@ -4572,33 +4577,56 @@
         };
 
 
-        window.segnaAllertCompletato = async (collezione, id, subId) => {
+        window.segnaAllertCompletato = (collezione, id, subId) => {
             const permCat = collezione === 'casa' ? 'casa' : (collezione === 'calendario' ? 'calendario' : 'veicoli');
             if (!window.puoModificare(permCat)) {
                 return mostraNotifica("Non hai i permessi per questa operazione.", "error");
             }
             
-            try {
-                if (collezione === 'casa') {
-                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', id), { completato: true });
-                } else if (collezione === 'calendario') {
-                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'calendario', id), { alert: false });
-                } else if (collezione === 'veicoli') {
-                    const v = window.appState.dati.veicoli.find(x => x.id === id);
-                    if (v && v.manutenzioni) {
-                        const nuoveMan = [...v.manutenzioni];
-                        const idx = nuoveMan.findIndex(m => m.idMan === subId);
-                        if (idx > -1) {
-                            nuoveMan[idx].completato = true;
-                            await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', id), { manutenzioni: nuoveMan });
+            window.chiediConferma("Sei sicuro di voler contrassegnare questo elemento come completato/risolto?", async () => {
+                try {
+                    if (collezione === 'casa') {
+                        await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'scadenze_casa', id), { completato: true });
+                    } else if (collezione === 'calendario') {
+                        await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'calendario', id), { alert: false });
+                    } else if (collezione === 'veicoli') {
+                        const v = window.appState.dati.veicoli.find(x => x.id === id);
+                        if (v && v.manutenzioni) {
+                            const nuoveMan = [...v.manutenzioni];
+                            const idx = nuoveMan.findIndex(m => m.idMan === subId);
+                            if (idx > -1) {
+                                const m = nuoveMan[idx];
+                                m.completato = true;
+                                
+                                // Auto-rinnovo per scadenze ricorrenti veicoli
+                                if (['Scadenza Bollo', 'Scadenza Assicurazione', 'Scadenza Revisione'].includes(m.tipoIntervento) && m.data) {
+                                    const oldData = new Date(m.data);
+                                    let addYears = (m.tipoIntervento === 'Scadenza Revisione') ? 2 : 1;
+                                    oldData.setFullYear(oldData.getFullYear() + addYears);
+                                    
+                                    const newScadenza = {
+                                        idMan: 'man_' + Date.now() + Math.floor(Math.random() * 1000),
+                                        tipoIntervento: m.tipoIntervento,
+                                        data: window.toISODateLocal(oldData),
+                                        dataProssima: '',
+                                        km: '',
+                                        importo: '', // Vuoto per obbligare all'inserimento
+                                        lavori: `Rinnovo automatico da scadenza precedente.`,
+                                        completato: false
+                                    };
+                                    nuoveMan.push(newScadenza);
+                                }
+                                
+                                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'veicoli', id), { manutenzioni: nuoveMan });
+                            }
                         }
                     }
+                    mostraNotifica("Avviso rimosso dal Quadro Generale!", "success");
+                } catch(e) {
+                    console.error(e);
+                    mostraNotifica("Errore durante l'aggiornamento", "error");
                 }
-                mostraNotifica("Avviso rimosso dal Quadro Generale!", "success");
-            } catch(e) {
-                console.error(e);
-                mostraNotifica("Errore durante l'aggiornamento", "error");
-            }
+            }, 'completa');
         };
 
 
