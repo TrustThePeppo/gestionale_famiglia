@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "13.11.2026_11.39";
+        const CURRENT_APP_VERSION = "23.11.2026_12.33";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -393,7 +393,10 @@
                 utenti: [],
                 audit_logs: []
             },
-            allegatiAperti: { idTarget: null, collezione: null }
+            allegatiAperti: { idTarget: null, collezione: null },
+            flipState: { 'spesa-flipper': false, 'detersivi-flipper': false },
+            searchSpesa: '',
+            searchDetersivi: ''
         };
 
         let refs = {};
@@ -509,7 +512,11 @@
 
                 window.toggleFlip = (id) => {
             const el = document.getElementById(id);
-            if(el) el.classList.toggle('is-flipped');
+            if (el) {
+                const isFlipped = el.classList.toggle('is-flipped');
+                if (!window.appState.flipState) window.appState.flipState = {};
+                window.appState.flipState[id] = isFlipped;
+            }
         };
 
         // --- SISTEMA DI NOTIFICHE ---
@@ -3241,109 +3248,154 @@
 
         
         // --- 1. LISTA DELLA SPESA ---
-        window.creaHtmlCiboSpesa = () => {
-            const spesaDb = window.appState.dati.cibo_spesa || [];
-            
-            // Ordiniamo per nome all'interno del calderone
-            const calderone = spesaDb.filter(s => !s.in_lista).sort((a, b) => a.nome.localeCompare(b.nome));
-            
-            // Ordiniamo per stato di acquisto e timestamp all'interno della lista
-            const inLista = spesaDb.filter(s => s.in_lista).sort((a, b) => (a.comprato === b.comprato) ? (b.ts - a.ts) : (a.comprato ? 1 : -1));
-
-            const renderItem = (item, isInLista) => {
-                if (isInLista) {
-                    return `
-                    <div id="spesa-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragSpesa(event, '${item.id}')" class="px-2 py-1.5 mb-1 bg-white rounded border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
-                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                            <input type="checkbox" onchange="toggleSpesaComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-4 h-4 text-rose-500 rounded border-slate-300 focus:ring-rose-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
-                            <button onclick="spostaSpesa('${item.id}', false)" class="md:hidden p-1 text-slate-400 hover:text-slate-600 rounded flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3 h-3"></i></button>
-                            
-                            <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 flex items-center justify-between pr-1">
-                                <span class="font-bold text-xs whitespace-normal break-words leading-snug mr-2">${window.escapeStr(item.nome)}</span>
-                                <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà" onblur="aggiornaQuantitaSpesa('${item.id}', this.value)" class="w-16 text-[10px] px-1 py-0.5 border border-slate-200 rounded outline-none focus:border-rose-400 bg-slate-50 focus:bg-white transition-colors text-right flex-shrink-0">
-                            </div>
-                        </div>
+        window.renderSpesaItem = (item, isInLista) => {
+            if (isInLista) {
+                return `
+                <div id="spesa-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragSpesa(event, '${item.id}')" class="px-2 py-1.5 mb-1 bg-white rounded border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <input type="checkbox" onchange="toggleSpesaComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-4 h-4 text-rose-500 rounded border-slate-300 focus:ring-rose-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
+                        ${puoModificare('cibo') ? `<button onclick="spostaSpesa('${item.id}', false)" class="p-1 text-slate-400 hover:text-slate-600 rounded flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3 h-3"></i></button>` : ''}
                         
-                        <div class="flex gap-0.5 ml-1 flex-shrink-0 border-l border-slate-100 pl-1">
-                            ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                        <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 flex items-center justify-between pr-1">
+                            <span class="font-bold text-xs whitespace-normal break-words leading-snug mr-2">${window.escapeStr(item.nome)}</span>
+                            <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà" onblur="aggiornaQuantitaSpesa('${item.id}', this.value)" class="w-16 text-[10px] px-1 py-0.5 border border-slate-200 rounded outline-none focus:border-rose-400 bg-slate-50 focus:bg-white transition-colors text-right flex-shrink-0">
                         </div>
-                    </div>`;
-                } else {
-                    return `
-                    <div id="spesa-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragSpesa(event, '${item.id}')" class="p-2 mb-1.5 bg-white rounded-md border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors break-inside-avoid w-full">
-                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                            <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400 hidden md:block flex-shrink-0"></i>
-                            <button onclick="spostaSpesa('${item.id}', true)" class="md:hidden p-1 bg-rose-100 text-rose-600 rounded flex-shrink-0" title="Sposta in Lista"><i data-lucide="arrow-right" class="w-3 h-3"></i></button>
-                            
-                            <div class="flex-1 text-slate-700 min-w-0">
-                                <span class="font-bold text-xs block whitespace-normal break-words leading-snug">${window.escapeStr(item.nome)}</span>
-                            </div>
+                    </div>
+                    
+                    <div class="flex gap-0.5 ml-1 flex-shrink-0 border-l border-slate-100 pl-1">
+                        ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                        <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                    </div>
+                </div>`;
+            } else {
+                return `
+                <div id="spesa-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragSpesa(event, '${item.id}')" class="p-2 mb-1.5 bg-white rounded-md border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors break-inside-avoid w-full">
+                    <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                        <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400 hidden md:block flex-shrink-0"></i>
+                        ${puoModificare('cibo') ? `<button onclick="spostaSpesa('${item.id}', true)" class="p-1 bg-rose-100 hover:bg-rose-200 text-rose-600 rounded flex-shrink-0 transition-colors" title="Aggiungi al Carrello"><i data-lucide="arrow-right" class="w-3 h-3"></i></button>` : ''}
+                        
+                        <div class="flex-1 text-slate-700 min-w-0">
+                            <span class="font-bold text-xs block whitespace-normal break-words leading-snug">${window.escapeStr(item.nome)}</span>
                         </div>
-                        <div class="flex gap-0.5 ml-1 flex-shrink-0">
-                            ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
-                        </div>
-                    </div>`;
-                }
-            };
+                    </div>
+                    <div class="flex gap-0.5 ml-1 flex-shrink-0">
+                        ${puoModificare('cibo') ? `<button onclick="apriModaleSpesa('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                        <button onclick="eliminaDoc('cibo_spesa', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                    </div>
+                </div>`;
+            }
+        };
 
-            const renderGrouped = (itemsList, isInLista, gridClass) => {
-                if (itemsList.length === 0) return '';
-                let htmlStr = '';
-                
-                window.CATEGORIE_SPESA.forEach(cat => {
-                    const groupItems = itemsList.filter(i => (i.categoria || 'Varie') === cat);
-                    if (groupItems.length > 0) {
-                        if (isInLista) {
-                            htmlStr += groupItems.map(i => renderItem(i, isInLista)).join('');
-                        } else {
-                            htmlStr += `<div class="mb-4">
-                                <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">${cat}</h5>
-                                <div class="${gridClass}">
-                                    ${groupItems.map(i => renderItem(i, isInLista)).join('')}
-                                </div>
-                            </div>`;
-                        }
-                    }
-                });
-                
-                const unknownItems = itemsList.filter(i => !window.CATEGORIE_SPESA.includes(i.categoria || 'Varie'));
-                if (unknownItems.length > 0) {
+        window.renderSpesaGrouped = (itemsList, isInLista, gridClass) => {
+            if (itemsList.length === 0) return '';
+            let htmlStr = '';
+            
+            window.CATEGORIE_SPESA.forEach(cat => {
+                const groupItems = itemsList.filter(i => (i.categoria || 'Varie') === cat);
+                if (groupItems.length > 0) {
                     if (isInLista) {
-                        htmlStr += unknownItems.map(i => renderItem(i, isInLista)).join('');
+                        htmlStr += groupItems.map(i => window.renderSpesaItem(i, isInLista)).join('');
                     } else {
                         htmlStr += `<div class="mb-4">
-                                <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">Altro</h5>
-                                <div class="${gridClass}">
-                                    ${unknownItems.map(i => renderItem(i, isInLista)).join('')}
-                                </div>
-                            </div>`;
+                            <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">${cat}</h5>
+                            <div class="${gridClass}">
+                                ${groupItems.map(i => window.renderSpesaItem(i, isInLista)).join('')}
+                            </div>
+                        </div>`;
                     }
                 }
-                
+            });
+            
+            const unknownItems = itemsList.filter(i => !window.CATEGORIE_SPESA.includes(i.categoria || 'Varie'));
+            if (unknownItems.length > 0) {
                 if (isInLista) {
-                    return `<div class="${gridClass}">${htmlStr}</div>`;
+                    htmlStr += unknownItems.map(i => window.renderSpesaItem(i, isInLista)).join('');
+                } else {
+                    htmlStr += `<div class="mb-4">
+                            <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1 border-b border-slate-200/50 pb-1">Altro</h5>
+                            <div class="${gridClass}">
+                                ${unknownItems.map(i => window.renderSpesaItem(i, isInLista)).join('')}
+                            </div>
+                        </div>`;
                 }
-                return htmlStr;
-            };
+            }
+            
+            if (isInLista) {
+                return `<div class="${gridClass}">${htmlStr}</div>`;
+            }
+            return htmlStr;
+        };
+
+        window.renderDispensaSpesaContent = (filtro = '') => {
+            const spesaDb = window.appState.dati.cibo_spesa || [];
+            const term = (filtro || '').trim().toLowerCase();
+            const calderone = spesaDb
+                .filter(s => !s.in_lista && (!term || (s.nome && s.nome.toLowerCase().includes(term))))
+                .sort((a, b) => a.nome.localeCompare(b.nome));
+            
+            if (calderone.length > 0) {
+                return window.renderSpesaGrouped(calderone, false, 'grid grid-cols-2 gap-x-2 content-start');
+            }
+            if (term) {
+                return `<div class="text-center py-8 px-4">
+                    <p class="text-xs text-slate-500 mb-2">Nessun prodotto trovato per "<strong>${window.escapeStr(filtro.trim())}</strong>".</p>
+                    <button type="button" onclick="pulisciRicercaSpesa()" class="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors">Pulisci ricerca</button>
+                </div>`;
+            }
+            return '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Usa "Aggiungi" per creare le tue voci abituali.</p>';
+        };
+
+        window.filtraDispensaSpesa = (val) => {
+            window.appState.searchSpesa = val;
+            const listEl = document.getElementById('dispensa-spesa-list');
+            if (listEl) {
+                listEl.innerHTML = window.renderDispensaSpesaContent(val);
+                if (window.lucide) window.lucide.createIcons({ root: listEl });
+            }
+            const clearBtn = document.getElementById('clear-search-spesa');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+        };
+
+        window.pulisciRicercaSpesa = () => {
+            const input = document.getElementById('search-dispensa-spesa');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            window.filtraDispensaSpesa('');
+        };
+
+        window.creaHtmlCiboSpesa = () => {
+            const spesaDb = window.appState.dati.cibo_spesa || [];
+            const inLista = spesaDb.filter(s => s.in_lista).sort((a, b) => (a.comprato === b.comprato) ? (b.ts - a.ts) : (a.comprato ? 1 : -1));
+            const isFlipped = !!(window.appState.flipState && window.appState.flipState['spesa-flipper']);
+            const searchVal = window.appState.searchSpesa || '';
 
             return `
             <div class="mt-2 h-[75vh] md:h-auto mobile-flip-container md:grid md:grid-cols-2 md:gap-4 lg:gap-6">
-                <div class="mobile-flipper md:contents" id="spesa-flipper">
+                <div class="mobile-flipper md:contents ${isFlipped ? 'is-flipped' : ''}" id="spesa-flipper">
                     <!-- FRONTE: COLONNA CALDERONE -->
                     <div class="mobile-front bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
                         <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
                             <div>
                                 <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa</h4>
-                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
+                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina o clicca la freccia per mettere i prodotti in lista.</p>
                             </div>
                             <button onclick="toggleFlip('spesa-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-slate-300 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none">
                                 Carrello <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
-                        <div class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y" ondrop="dropSpesa(event, false)" ondragover="allowDropSpesa(event)">
-                            ${calderone.length > 0 ? renderGrouped(calderone, false, 'grid grid-cols-2 gap-x-2 content-start') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Usa "Aggiungi" per creare le tue voci abituali.</p>'}
+                        <div class="p-2.5 bg-slate-100 border-b border-slate-200">
+                            <div class="relative">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                                <input type="text" id="search-dispensa-spesa" value="${window.escapeStr(searchVal)}" oninput="filtraDispensaSpesa(this.value)" placeholder="Cerca alimento in dispensa..." class="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded-lg outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all shadow-sm">
+                                <button type="button" id="clear-search-spesa" onclick="pulisciRicercaSpesa()" class="${searchVal ? '' : 'hidden'} absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded" title="Pulisci ricerca">
+                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="dispensa-spesa-list" class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y" ondrop="dropSpesa(event, false)" ondragover="allowDropSpesa(event)">
+                            ${window.renderDispensaSpesaContent(searchVal)}
                         </div>
                     </div>
 
@@ -3359,7 +3411,7 @@
                             </button>
                         </div>
                         <div class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y" ondrop="dropSpesa(event, true)" ondragover="allowDropSpesa(event)">
-                            ${inLista.length > 0 ? renderGrouped(inLista, true, 'block') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-rose-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-rose-400 font-medium">Nessun articolo in lista</p></div>'}
+                            ${inLista.length > 0 ? window.renderSpesaGrouped(inLista, true, 'block') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-rose-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-rose-400 font-medium">Nessun articolo in lista</p></div>'}
                         </div>
                     </div>
                 </div>
@@ -3523,66 +3575,114 @@
 
         
         // --- 1.5 DETERSIVI E PRODOTTI CASA ---
+        window.renderDetersivoItem = (item, isInLista) => {
+            if (isInLista) {
+                return `
+                <div id="det-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragDetersivo(event, '${item.id}')" class="px-2 py-1.5 mb-1 bg-white rounded border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <input type="checkbox" onchange="toggleDetersivoComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-4 h-4 text-teal-500 rounded border-slate-300 focus:ring-teal-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
+                        ${puoModificare('cibo') ? `<button onclick="spostaDetersivo('${item.id}', false)" class="p-1 text-slate-400 hover:text-slate-600 rounded flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3 h-3"></i></button>` : ''}
+                        
+                        <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 flex items-center justify-between pr-1">
+                            <span class="font-bold text-xs whitespace-normal break-words leading-snug mr-2">${window.escapeStr(item.nome)}</span>
+                            <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà" onblur="aggiornaQuantitaDetersivo('${item.id}', this.value)" class="w-16 text-[10px] px-1 py-0.5 border border-slate-200 rounded outline-none focus:border-teal-400 bg-slate-50 focus:bg-white transition-colors text-right flex-shrink-0">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-0.5 ml-1 flex-shrink-0 border-l border-slate-100 pl-1">
+                        ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                        <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                    </div>
+                </div>`;
+            } else {
+                return `
+                <div id="det-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragDetersivo(event, '${item.id}')" class="p-2 mb-1.5 bg-white rounded-md border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors break-inside-avoid w-full">
+                    <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                        <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400 hidden md:block flex-shrink-0"></i>
+                        ${puoModificare('cibo') ? `<button onclick="spostaDetersivo('${item.id}', true)" class="p-1 bg-teal-100 hover:bg-teal-200 text-teal-600 rounded flex-shrink-0 transition-colors" title="Aggiungi al Carrello"><i data-lucide="arrow-right" class="w-3 h-3"></i></button>` : ''}
+                        
+                        <div class="flex-1 text-slate-700 min-w-0">
+                            <span class="font-bold text-xs block whitespace-normal break-words leading-snug">${window.escapeStr(item.nome)}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-0.5 ml-1 flex-shrink-0">
+                        ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
+                        <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                    </div>
+                </div>`;
+            }
+        };
+
+        window.renderDispensaDetersiviContent = (filtro = '') => {
+            const detDb = window.appState.dati.detersivi || [];
+            const term = (filtro || '').trim().toLowerCase();
+            const calderone = detDb
+                .filter(s => !s.in_lista && (!term || (s.nome && s.nome.toLowerCase().includes(term))))
+                .sort((a, b) => a.nome.localeCompare(b.nome));
+            
+            if (calderone.length > 0) {
+                return `<div class="grid grid-cols-2 gap-x-2 content-start">${calderone.map(i => window.renderDetersivoItem(i, false)).join('')}</div>`;
+            }
+            if (term) {
+                return `<div class="text-center py-8 px-4">
+                    <p class="text-xs text-slate-500 mb-2">Nessun prodotto trovato per "<strong>${window.escapeStr(filtro.trim())}</strong>".</p>
+                    <button type="button" onclick="pulisciRicercaDetersivi()" class="text-xs font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg border border-teal-200 transition-colors">Pulisci ricerca</button>
+                </div>`;
+            }
+            return '<p class="text-center text-xs text-slate-400 py-6">Archivio vuoto. Aggiungi i tuoi detersivi abituali.</p>';
+        };
+
+        window.filtraDispensaDetersivi = (val) => {
+            window.appState.searchDetersivi = val;
+            const listEl = document.getElementById('dispensa-detersivi-list');
+            if (listEl) {
+                listEl.innerHTML = window.renderDispensaDetersiviContent(val);
+                if (window.lucide) window.lucide.createIcons({ root: listEl });
+            }
+            const clearBtn = document.getElementById('clear-search-detersivi');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+        };
+
+        window.pulisciRicercaDetersivi = () => {
+            const input = document.getElementById('search-dispensa-detersivi');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            window.filtraDispensaDetersivi('');
+        };
+
         window.creaHtmlDetersivi = () => {
             const detDb = window.appState.dati.detersivi || [];
-            
-            const calderone = detDb.filter(s => !s.in_lista).sort((a, b) => a.nome.localeCompare(b.nome));
             const inLista = detDb.filter(s => s.in_lista).sort((a, b) => (a.comprato === b.comprato) ? (b.ts - a.ts) : (a.comprato ? 1 : -1));
-
-            const renderItem = (item, isInLista) => {
-                if (isInLista) {
-                    return `
-                    <div id="det-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragDetersivo(event, '${item.id}')" class="px-2 py-1.5 mb-1 bg-white rounded border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors ${item.comprato ? 'opacity-50 bg-slate-50' : ''}">
-                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                            <input type="checkbox" onchange="toggleDetersivoComprato('${item.id}', this.checked)" ${item.comprato ? 'checked' : ''} class="w-4 h-4 text-teal-500 rounded border-slate-300 focus:ring-teal-500 cursor-pointer flex-shrink-0" ${!window.puoModificare('cibo') ? 'disabled' : ''}>
-                            <button onclick="spostaDetersivo('${item.id}', false)" class="md:hidden p-1 text-slate-400 hover:text-slate-600 rounded flex-shrink-0" title="Rimetti in Dispensa"><i data-lucide="arrow-left" class="w-3 h-3"></i></button>
-                            
-                            <div class="flex-1 ${item.comprato ? 'line-through text-slate-400' : 'text-slate-700'} min-w-0 flex items-center justify-between pr-1">
-                                <span class="font-bold text-xs whitespace-normal break-words leading-snug mr-2">${window.escapeStr(item.nome)}</span>
-                                <input type="text" value="${window.escapeStr(item.quantita)}" placeholder="Q.tà" onblur="aggiornaQuantitaDetersivo('${item.id}', this.value)" class="w-16 text-[10px] px-1 py-0.5 border border-slate-200 rounded outline-none focus:border-teal-400 bg-slate-50 focus:bg-white transition-colors text-right flex-shrink-0">
-                            </div>
-                        </div>
-                        
-                        <div class="flex gap-0.5 ml-1 flex-shrink-0 border-l border-slate-100 pl-1">
-                            ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
-                        </div>
-                    </div>`;
-                } else {
-                    return `
-                    <div id="det-${item.id}" ${window.innerWidth > 768 ? 'draggable="true"' : ''} ondragstart="dragDetersivo(event, '${item.id}')" class="p-2 mb-1.5 bg-white rounded-md border border-slate-200 shadow-sm flex items-center justify-between cursor-move hover:border-blue-400 transition-colors break-inside-avoid w-full">
-                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                            <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400 hidden md:block flex-shrink-0"></i>
-                            <button onclick="spostaDetersivo('${item.id}', true)" class="md:hidden p-1 bg-teal-100 text-teal-600 rounded flex-shrink-0" title="Sposta in Lista"><i data-lucide="arrow-right" class="w-3 h-3"></i></button>
-                            
-                            <div class="flex-1 text-slate-700 min-w-0">
-                                <span class="font-bold text-xs block whitespace-normal break-words leading-snug">${window.escapeStr(item.nome)}</span>
-                            </div>
-                        </div>
-                        <div class="flex gap-0.5 ml-1 flex-shrink-0">
-                            ${puoModificare('cibo') ? `<button onclick="apriModaleDetersivo('${item.id}')" class="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"><i data-lucide="edit" class="w-3 h-3"></i></button>
-                            <button onclick="eliminaDoc('detersivi', '${item.id}')" class="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
-                        </div>
-                    </div>`;
-                }
-            };
+            const isFlipped = !!(window.appState.flipState && window.appState.flipState['detersivi-flipper']);
+            const searchVal = window.appState.searchDetersivi || '';
 
             return `
             <div class="mt-2 h-[75vh] md:h-auto mobile-flip-container md:grid md:grid-cols-2 md:gap-4 lg:gap-6">
-                <div class="mobile-flipper md:contents" id="detersivi-flipper">
+                <div class="mobile-flipper md:contents ${isFlipped ? 'is-flipped' : ''}" id="detersivi-flipper">
                     <!-- FRONTE -->
                     <div class="mobile-front bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
                         <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
                             <div>
                                 <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i data-lucide="package-open" class="w-4 h-4"></i> Dispensa</h4>
-                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina gli elementi verso destra per metterli in lista.</p>
+                                <p class="text-[11px] text-slate-500 mt-1 hidden md:block">Trascina o clicca la freccia per mettere i prodotti in lista.</p>
                             </div>
                             <button onclick="toggleFlip('detersivi-flipper')" class="md:hidden flex items-center gap-1.5 bg-white border border-slate-300 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none">
                                 Carrello <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
-                        <div class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y ${calderone.length > 0 ? 'grid grid-cols-2 gap-x-2 content-start' : ''}" ondrop="dropDetersivo(event, false)" ondragover="allowDropDetersivo(event)">
-                            ${calderone.length > 0 ? calderone.map(i => renderItem(i, false)).join('') : '<p class="text-center text-xs text-slate-400 py-6 col-span-2">Archivio vuoto. Aggiungi i tuoi detersivi abituali.</p>'}
+                        <div class="p-2.5 bg-slate-100 border-b border-slate-200">
+                            <div class="relative">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                                <input type="text" id="search-dispensa-detersivi" value="${window.escapeStr(searchVal)}" oninput="filtraDispensaDetersivi(this.value)" placeholder="Cerca detersivo in dispensa..." class="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded-lg outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all shadow-sm">
+                                <button type="button" id="clear-search-detersivi" onclick="pulisciRicercaDetersivi()" class="${searchVal ? '' : 'hidden'} absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded" title="Pulisci ricerca">
+                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="dispensa-detersivi-list" class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y" ondrop="dropDetersivo(event, false)" ondragover="allowDropDetersivo(event)">
+                            ${window.renderDispensaDetersiviContent(searchVal)}
                         </div>
                     </div>
 
@@ -3598,7 +3698,7 @@
                             </button>
                         </div>
                         <div class="p-3 flex-1 overflow-y-auto overscroll-contain touch-pan-y" ondrop="dropDetersivo(event, true)" ondragover="allowDropDetersivo(event)">
-                            ${inLista.length > 0 ? inLista.map(i => renderItem(i, true)).join('') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-teal-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-teal-500 font-medium">Nessun detersivo in lista</p></div>'}
+                            ${inLista.length > 0 ? inLista.map(i => window.renderDetersivoItem(i, true)).join('') : '<div class="text-center py-10"><i data-lucide="arrow-down-to-line" class="w-8 h-8 text-teal-300 mx-auto mb-2 hidden md:block"></i><p class="text-xs text-teal-500 font-medium">Nessun detersivo in lista</p></div>'}
                         </div>
                     </div>
                 </div>
