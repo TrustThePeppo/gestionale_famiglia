@@ -5,10 +5,10 @@ Un applicativo web progressivo (PWA) leggero, portatile, utilizzabile anche offl
 ## 🌟 Funzionalità Principali
 - **Quadro Generale & Alert (40 giorni):** Visione d'insieme con banner automatico per le scadenze imminenti o scadute.
 - **Notifiche Email Automatiche (Serverless Cronjob):** Riepilogo mattutino automatico tramite Google Apps Script sincronizzato con le regole del Quadro Generale.
-- **Gestione Casa:** Controllo rate condominiali, verbali, rendiconti, caldaia e spese varie con archivio allegati.
+- **Gestione Casa:** Controllo Rate Condominio (con riepilogo annuale e copia rapida ultima rata), Caldaia e Varie con gestione stato e archivio allegati.
 - **Gestione Veicoli:** Anagrafica dei mezzi (auto e moto), scadenze legali (Bollo, Assicurazione, Revisione), storico manutenzioni e calcolo automatico del prossimo tagliando (+1 anno) e inversione pneumatici.
 - **Finanze e Prestiti:** Calcolo automatico rate pagate, residuo capitale/interessi e piano di ammortamento alla francese allineato al centesimo.
-- **Alimenti, Detersivi e Spese Supermercato:** Lista della spesa e detersivi interattiva (Dispensa / Carrello), gestione Spese Supermercato con riepilogo storico dei totali mensili, Menu Settimanale esportabile in PDF e Ricettario con integrazione ingredienti.
+- **Alimenti, Detersivi e Spese Supermercato:** Lista della spesa e detersivi interattiva (Dispensa con ricerca rapida / Carrello), gestione Spese Supermercato con riepilogo storico dei totali mensili, Menu Settimanale esportabile in PDF e Ricettario con integrazione ingredienti.
 - **Carte e Tessere (Stocard Clone):** Portafoglio digitale con scanner fotocamera e generazione codici a barre (EAN-13, EAN-8, UPC, CODE128).
 - **Blocco Note & Agenda Condivisa:** Note rapide con ricerca ed evidenziazione, più calendario mensile condiviso per tutta la famiglia.
 - **Scadenzario & Esportazione:** Motore di ricerca scadenze per data o anno solare con esportazione in Word (`.docx`) e PDF tabellare.

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestionale-family-23.11.2026_12.33';
+const CACHE_NAME = 'gestionale-family-24.11.2026_09.44';
 const LOCAL_ASSETS = [
     './',
     './index.html',
@@ -43,10 +43,10 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(async (cache) => {
             await cache.addAll(LOCAL_ASSETS);
-            for (const url of EXTERNAL_ASSETS) {
+            await Promise.allSettled(EXTERNAL_ASSETS.map(async (url) => {
                 try {
                     const req = new Request(url, { mode: 'cors' });
-                    const res = await fetch(req);
+                    const res = await fetchWithTimeout(req, 5000);
                     if (res.ok) {
                         await cache.put(url, res.clone());
                         if (res.url && res.url !== url) {
@@ -56,11 +56,11 @@ self.addEventListener('install', (event) => {
                 } catch (e) {
                     try {
                         const reqNoCors = new Request(url, { mode: 'no-cors' });
-                        const resNoCors = await fetch(reqNoCors);
+                        const resNoCors = await fetchWithTimeout(reqNoCors, 5000);
                         await cache.put(url, resNoCors);
                     } catch (err) {}
                 }
-            }
+            }));
         })
     );
 });
@@ -83,6 +83,7 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     
     const url = event.request.url;
+    if (!url.startsWith('http')) return;
 
     // Ignoriamo le chiamate API di Firebase (gestite dalla cache persistente IndexedDB di Firestore)
     if (url.includes('firestore.googleapis.com')) return;
