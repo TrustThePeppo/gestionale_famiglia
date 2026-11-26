@@ -317,7 +317,7 @@
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc as fbAddDoc, deleteDoc as fbDeleteDoc, doc, updateDoc as fbUpdateDoc, getDoc, getDocFromCache, setDoc as fbSetDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         
-        const CURRENT_APP_VERSION = "24.11.2026_09.44";
+        const CURRENT_APP_VERSION = "26.11.2026_09.35";
         const savedVersion = localStorage.getItem('gestionale_version');
         if (savedVersion && savedVersion !== CURRENT_APP_VERSION) {
             setTimeout(() => {
@@ -4193,6 +4193,18 @@
 
 // --- 2. MENU SETTIMANALE ---
         const GIORNI_SETTIMANA = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+
+        window.formattaDataOraIT = (ts) => {
+            if (!ts) return '';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+        };
         
         window.creaHtmlCiboMenu = () => {
             const menuDb = window.appState.dati.cibo_menu || [];
@@ -4200,12 +4212,16 @@
             return `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 mt-2">` + GIORNI_SETTIMANA.map(giorno => {
                 const dayData = menuDb.find(d => d.giorno === giorno) || { pranzo: '', cena: '' };
                 const idDoc = dayData.id || '';
+                const ultimaMod = window.formattaDataOraIT(dayData.ts);
                 
                 return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative group transition-all hover:shadow-md">
-                    <div class="bg-slate-800 p-3 flex justify-between items-center text-white">
-                        <h4 class="font-bold text-sm tracking-wide uppercase flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4 text-slate-300"></i> ${giorno}</h4>
-                        ${puoModificare('cibo') ? `<button onclick="svuotaMenuDay('${giorno}', '${idDoc}')" class="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-red-400" title="Svuota campi di ${giorno}"><i data-lucide="eraser" class="w-4 h-4"></i></button>` : ''}
+                    <div class="bg-slate-800 p-3 flex justify-between items-center text-white gap-2">
+                        <div class="flex items-center gap-2 flex-wrap min-w-0">
+                            <h4 class="font-bold text-sm tracking-wide uppercase flex items-center gap-2 flex-shrink-0"><i data-lucide="calendar" class="w-4 h-4 text-slate-300"></i> ${giorno}</h4>
+                            ${ultimaMod ? `<span class="text-[11px] font-normal text-slate-300 bg-slate-700/80 px-2 py-0.5 rounded-md whitespace-nowrap" title="Ultima modifica">${ultimaMod}</span>` : ''}
+                        </div>
+                        ${puoModificare('cibo') ? `<button onclick="svuotaMenuDay('${giorno}', '${idDoc}')" class="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-red-400 flex-shrink-0" title="Svuota campi di ${giorno}"><i data-lucide="eraser" class="w-4 h-4"></i></button>` : ''}
                     </div>
                     <div class="p-4 flex-1 flex flex-col gap-4">
                         <div>
@@ -4223,11 +4239,18 @@
         };
 
         window.salvaMenuDayDiretto = async (giorno, idDoc, campo, valore) => {
+            if (!window.puoModificare('cibo')) return;
+            const menuDb = window.appState.dati.cibo_menu || [];
+            const existing = idDoc ? menuDb.find(d => d.id === idDoc) : menuDb.find(d => d.giorno === giorno);
+            const prevVal = existing ? (existing[campo] || '') : '';
+            if (valore === prevVal) return; // Evita di aggiornare la data/ora se il testo non è cambiato
+
+            const targetId = idDoc || (existing ? existing.id : '');
             const data = { ts: Date.now() };
             data[campo] = valore;
             try {
-                if (idDoc) {
-                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_menu', idDoc), data);
+                if (targetId) {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_menu', targetId), data);
                 } else {
                     data.giorno = giorno;
                     if(campo==='pranzo') data.cena = ''; else data.pranzo = '';
@@ -4239,6 +4262,7 @@
         };
 
         window.svuotaMenuDay = async (giorno, idDoc) => {
+            if (!window.puoModificare('cibo')) return;
             if (idDoc) {
                 await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUserId, 'cibo_menu', idDoc), { pranzo: '', cena: '', ts: Date.now() });
                 mostraNotifica("Campi svuotati", "success");
